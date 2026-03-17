@@ -8,6 +8,9 @@ import { Footer } from "@/components/layout/Footer";
 import { SplashScreen } from "@/components/layout/SplashScreen";
 import { AmbientFX } from "@/components/ui/AmbientFX";
 import { PremiumUIProvider } from "@/components/providers/PremiumUIProvider";
+import { SmoothScrollController } from "@/components/ui/SmoothScrollController";
+import { CustomCursor } from "@/components/ui/CustomCursor";
+import { InteractiveLight } from "@/components/ui/InteractiveLight";
 
 type SiteLayoutShellProps = {
     children: ReactNode;
@@ -32,7 +35,10 @@ export function SiteLayoutShell({ children }: SiteLayoutShellProps) {
             <AnimatePresence mode="wait">{showSplash && <SplashScreen key="splash" onDone={handleSplashDone} />}</AnimatePresence>
             <PremiumUIProvider>
                 <div className="relative min-h-screen bg-[#0B0B0B] pb-24 text-[#F5F5F5] lg:pb-0" style={{ contain: "paint" }}>
+                    <SmoothScrollController />
                     <AmbientFX />
+                    <InteractiveLight />
+                    <CustomCursor />
                     <div className="relative z-10" style={{ willChange: "auto" }}>
                         <Navbar />
                         <main key={pathname} className="pt-24">{children}</main>

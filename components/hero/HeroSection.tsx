@@ -5,6 +5,7 @@ import { motion, useScroll, useTransform } from "framer-motion";
 import { ChevronDown } from "lucide-react";
 import { GrillScene } from "@/components/hero/GrillScene";
 import { LuxuryButton } from "@/components/ui/LuxuryButton";
+import { AnimatedHeading } from "@/components/ui/AnimatedHeading";
 
 function stableValue(index: number, multiplier: number, offset: number = 0) {
     const raw = Math.sin(index * multiplier + offset) * 43758.5453;
@@ -38,9 +39,11 @@ export function HeroSection() {
             })),
         []
     );
+    const hour = new Date().getHours();
+    const greeting = hour < 12 ? "Good Morning" : hour < 18 ? "Good Afternoon" : "Good Evening";
 
     return (
-        <section ref={sectionRef} className="relative isolate h-screen min-h-[760px] overflow-hidden">
+        <section ref={sectionRef} className="relative isolate h-screen min-h-[760px] overflow-hidden section-fade-edge">
             {/* Static gradient - no JS animation on background-position */}
             <motion.div
                 className="absolute inset-0"
@@ -80,21 +83,14 @@ export function HeroSection() {
                 style={{ y: contentY, opacity: contentOpacity, willChange: "transform, opacity" }}
                 className="relative z-10 mx-auto flex h-full max-w-6xl flex-col items-center justify-center px-6 text-center"
             >
-                <motion.h1
-                    initial={{ opacity: 0, y: 36 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 1.05, ease: "easeOut" }}
-                    className="max-w-4xl font-[var(--font-heading)] text-5xl leading-[1.15] tracking-[0.04em] md:text-7xl"
-                    style={{
-                        backgroundImage: "linear-gradient(to right, #F5F5F5 0%, #CFAF63 45%, #FF6A00 100%)",
-                        backgroundClip: "text",
-                        WebkitBackgroundClip: "text",
-                        WebkitTextFillColor: "transparent",
-                    }}
-                >
-                    <span className="block">Where Fire</span>
-                    <span className="block">Meets Flavor</span>
-                </motion.h1>
+                <motion.p initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }} className="mb-5 rounded-full border border-[#D4AF37]/20 bg-[#111111]/55 px-4 py-2 text-xs tracking-[0.24em] text-[#D4AF37] backdrop-blur-md">
+                    {greeting} 🍷
+                </motion.p>
+
+                <AnimatedHeading
+                    lines={["Where Fire", "Meets Flavor"]}
+                    className="max-w-4xl font-(--font-heading) text-5xl leading-[1.15] tracking-[0.04em] md:text-7xl shimmer-text"
+                />
 
                 <motion.p
                     initial={{ opacity: 0, y: 24 }}
