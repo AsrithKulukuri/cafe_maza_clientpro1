@@ -10,6 +10,7 @@ import { ScrollProgressBar } from "@/components/ui/ScrollProgressBar";
 import { MobileBottomNav } from "@/components/ui/MobileBottomNav";
 import { SoundToggle } from "@/components/ui/SoundToggle";
 import { FloatingActionButtons } from "@/components/ui/FloatingActionButtons";
+import { usePathname } from "next/navigation";
 
 type PremiumUIContextValue = {
     cartItems: CartItem[];
@@ -36,6 +37,7 @@ function randomId() {
 }
 
 export function PremiumUIProvider({ children }: { children: ReactNode }) {
+    const pathname = usePathname();
     const [cartItems, setCartItems] = useState<CartItem[]>([]);
     const [cartOpen, setCartOpen] = useState(false);
     const [bookingOpen, setBookingOpen] = useState(false);
@@ -96,6 +98,7 @@ export function PremiumUIProvider({ children }: { children: ReactNode }) {
 
     const cartCount = useMemo(() => cartItems.reduce((sum, item) => sum + item.qty, 0), [cartItems]);
     const cartTotal = useMemo(() => cartItems.reduce((sum, item) => sum + item.price * item.qty, 0), [cartItems]);
+    const showFloatingActions = pathname !== "/menu";
 
     const value: PremiumUIContextValue = {
         cartItems,
@@ -120,7 +123,7 @@ export function PremiumUIProvider({ children }: { children: ReactNode }) {
             <ScrollProgressBar />
             {children}
             <SoundToggle enabled={soundEnabled} onToggle={toggleSound} />
-            <FloatingActionButtons cartCount={cartCount} onCart={() => setCartOpen(true)} onBook={() => setBookingOpen(true)} />
+            {showFloatingActions ? <FloatingActionButtons cartCount={cartCount} onCart={() => setCartOpen(true)} onBook={() => setBookingOpen(true)} /> : null}
             <MobileBottomNav onCartOpen={() => setCartOpen(true)} onBookOpen={() => setBookingOpen(true)} />
             <CartDrawer
                 open={cartOpen}

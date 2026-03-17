@@ -81,7 +81,7 @@ export default function MenuPage() {
                 </p>
             </SectionReveal>
 
-            <div className="sticky top-22 z-30 mb-8 rounded-2xl border border-[#D4AF37]/18 bg-[#101010]/70 p-3 backdrop-blur-xl">
+            <div className="sticky top-20 z-30 mb-4 rounded-2xl border border-[#D4AF37]/18 bg-[#101010]/70 p-3 backdrop-blur-xl md:mb-8 md:top-22">
                 <div className="relative mb-3">
                     <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#D4AF37]/75" />
                     <input
@@ -91,12 +91,12 @@ export default function MenuPage() {
                         className="w-full rounded-xl border border-[#D4AF37]/20 bg-[#0E0E0E]/85 py-2.5 pl-9 pr-3 text-sm text-[#F5F5F5] outline-none transition focus:border-[#D4AF37]"
                     />
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex gap-2 overflow-x-auto pb-1">
                     {menuCategories.map((category) => (
                         <button
                             key={category.id}
                             onClick={() => scrollToCategory(category.id)}
-                            className={`rounded-full border px-4 py-2 text-xs transition ${active === category.id
+                            className={`shrink-0 rounded-full border px-4 py-2 text-xs transition ${active === category.id
                                 ? "border-[#D4AF37] bg-[#D4AF37]/15 text-[#F5F5F5]"
                                 : "border-[#D4AF37]/25 bg-[#151515]/85 text-[#F5F5F5]/75 hover:border-[#D4AF37]/55 hover:text-[#D4AF37]"
                                 }`}
@@ -114,7 +114,7 @@ export default function MenuPage() {
                     ))}
                 </div>
             ) : filteredCategories.length ? (
-                <div className="space-y-12">
+                <div className="space-y-8 md:space-y-12">
                     {filteredCategories.map((category) => (
                         <section
                             key={category.id}
@@ -122,10 +122,10 @@ export default function MenuPage() {
                             ref={(element) => {
                                 sectionRefs.current[category.id] = element;
                             }}
-                            className="scroll-mt-36"
+                            className="scroll-mt-52 md:scroll-mt-36"
                         >
-                            <div className="mb-5 border-b border-[#D4AF37]/18 pb-3">
-                                <h2 className="font-(--font-heading) text-4xl text-[#F5F5F5]">{category.label}</h2>
+                            <div className="mb-4 border-b border-[#D4AF37]/18 pb-2 md:mb-5 md:pb-3">
+                                <h2 className="font-(--font-heading) text-3xl text-[#F5F5F5] md:text-4xl">{category.label}</h2>
                             </div>
 
                             <motion.div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3" variants={staggerChildren} initial="hidden" whileInView="show" viewport={{ once: true, amount: 0.1 }}>
