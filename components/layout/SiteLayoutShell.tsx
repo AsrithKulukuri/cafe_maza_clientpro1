@@ -7,6 +7,7 @@ import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { SplashScreen } from "@/components/layout/SplashScreen";
 import { AmbientFX } from "@/components/ui/AmbientFX";
+import { PremiumUIProvider } from "@/components/providers/PremiumUIProvider";
 
 type SiteLayoutShellProps = {
     children: ReactNode;
@@ -29,14 +30,16 @@ export function SiteLayoutShell({ children }: SiteLayoutShellProps) {
     return (
         <>
             <AnimatePresence mode="wait">{showSplash && <SplashScreen key="splash" onDone={handleSplashDone} />}</AnimatePresence>
-            <div className="relative min-h-screen bg-[#0B0B0B] text-[#F5F5F5]" style={{ contain: "paint" }}>
-                <AmbientFX />
-                <div className="relative z-10" style={{ willChange: "auto" }}>
-                    <Navbar />
-                    <main key={pathname} className="pt-24">{children}</main>
-                    <Footer />
+            <PremiumUIProvider>
+                <div className="relative min-h-screen bg-[#0B0B0B] pb-24 text-[#F5F5F5] lg:pb-0" style={{ contain: "paint" }}>
+                    <AmbientFX />
+                    <div className="relative z-10" style={{ willChange: "auto" }}>
+                        <Navbar />
+                        <main key={pathname} className="pt-24">{children}</main>
+                        <Footer />
+                    </div>
                 </div>
-            </div>
+            </PremiumUIProvider>
         </>
     );
 }

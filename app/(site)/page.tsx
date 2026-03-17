@@ -9,6 +9,8 @@ import { SectionReveal } from "@/components/ui/SectionReveal";
 import { LuxuryButton } from "@/components/ui/LuxuryButton";
 import { GoldDivider } from "@/components/ui/GoldDivider";
 import { ScreeningBookingModal } from "@/components/ui/ScreeningBookingModal";
+import { TestimonialsCarousel } from "@/components/ui/TestimonialsCarousel";
+import { ChefStorySection } from "@/components/ui/ChefStorySection";
 import { featuredDishes, grillFeatures, menuCategories, premiumPhotos } from "@/data/mockData";
 
 export default function HomePage() {
@@ -27,7 +29,7 @@ export default function HomePage() {
             <HeroSection />
 
             {/* 2. QUICK ACTIONS */}
-            <SectionReveal className="mx-auto max-w-6xl px-6 md:px-10">
+            <SectionReveal direction="left" className="mx-auto max-w-6xl px-6 md:px-10 section-glow">
                 <p className="text-sm uppercase tracking-[0.2em] text-[#CFAF63]">Quick Actions</p>
                 <h2 className="mt-2 font-[var(--font-heading)] text-4xl text-[#F5F5F5]">Experience Cafe Maza</h2>
                 <GoldDivider className="max-w-md" />
@@ -53,7 +55,7 @@ export default function HomePage() {
             </SectionReveal>
 
             {/* 3. SIGNATURE DISHES */}
-            <SectionReveal className="mx-auto max-w-6xl px-6 md:px-10">
+            <SectionReveal direction="right" className="mx-auto max-w-6xl px-6 md:px-10 section-glow">
                 <div className="mb-8">
                     <p className="text-sm uppercase tracking-[0.2em] text-[#CFAF63]">Chef Recommended</p>
                     <h2 className="mt-2 font-[var(--font-heading)] text-4xl text-[#F5F5F5]">Signature Dishes</h2>
@@ -190,7 +192,7 @@ export default function HomePage() {
                                 <div className="relative rounded-3xl border border-[#CFAF63]/20 bg-[#0A0A0A]/80 p-8 backdrop-blur-sm">
                                     {/* Screen */}
                                     <div className="relative mx-auto mb-3 h-20 w-full rounded-xl border border-[#CFAF63]/50 bg-gradient-to-b from-[#0D1117] to-[#0A0A0A] overflow-hidden flex items-center justify-center shadow-[0_0_40px_rgba(207,175,99,0.45),0_0_60px_rgba(255,106,0,0.25)] group">
-                                        <motion.div 
+                                        <motion.div
                                             className="absolute inset-0 rounded-xl bg-gradient-to-br from-[#CFAF63]/25 via-[#FF6A00]/15 to-transparent"
                                             animate={{ opacity: [0.4, 0.8, 0.4] }}
                                             transition={{ duration: 1.5, repeat: Infinity, repeatType: "reverse" }}
@@ -280,6 +282,19 @@ export default function HomePage() {
                         </motion.article>
                     ))}
                 </div>
+            </SectionReveal>
+
+            <SectionReveal className="mx-auto max-w-6xl px-6 md:px-10 section-glow">
+                <p className="text-sm uppercase tracking-[0.2em] text-[#CFAF63]">Guest Voices</p>
+                <h2 className="mt-2 font-[var(--font-heading)] text-4xl text-[#F5F5F5]">Testimonials</h2>
+                <GoldDivider className="max-w-sm" />
+                <div className="mt-8">
+                    <TestimonialsCarousel />
+                </div>
+            </SectionReveal>
+
+            <SectionReveal direction="right" className="mx-auto max-w-6xl px-6 md:px-10">
+                <ChefStorySection />
             </SectionReveal>
 
             {/* 6. PREMIUM AMBIANCE GALLERY */}

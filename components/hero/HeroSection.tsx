@@ -42,8 +42,10 @@ export function HeroSection() {
     return (
         <section ref={sectionRef} className="relative isolate h-screen min-h-[760px] overflow-hidden">
             {/* Static gradient - no JS animation on background-position */}
-            <div
+            <motion.div
                 className="absolute inset-0"
+                animate={{ scale: [1, 1.035, 1] }}
+                transition={{ duration: 18, ease: "easeInOut", repeat: Infinity }}
                 style={{
                     backgroundImage:
                         "radial-gradient(circle at 20% 18%, rgba(255,106,0,0.24), transparent 42%), radial-gradient(circle at 82% 72%, rgba(207,175,99,0.2), transparent 46%), linear-gradient(140deg, #0B0B0B 0%, #141414 60%, #0B0B0B 100%)",
@@ -107,7 +109,7 @@ export function HeroSection() {
                     <div className="pointer-events-none absolute inset-0 -z-10 mx-auto h-32 w-80 rounded-full bg-[radial-gradient(circle,rgba(255,106,0,0.55),transparent_68%)] blur-3xl animate-pulse" />
                     <motion.div
                         whileHover={{ scale: 1.05 }}
-                        animate={{ boxShadow: ["0_0_20px_rgba(255,106,0,0.2)", "0_0_40px_rgba(255,106,0,0.45)", "0_0_20px_rgba(255,106,0,0.2)"] }}
+                        animate={{ boxShadow: ["0_0_14px_rgba(255,106,0,0.16)", "0_0_32px_rgba(255,106,0,0.38)", "0_0_14px_rgba(255,106,0,0.16)"] }}
                         transition={{ duration: 3, repeat: Infinity, repeatType: "reverse", repeatDelay: 1.5 }}
                     >
                         <LuxuryButton href="/reserve-table" className="min-w-[185px] px-8 py-3 text-sm md:text-base">

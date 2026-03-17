@@ -5,11 +5,13 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { navLinks } from "@/data/mockData";
 import { BrandLogo } from "@/components/ui/BrandLogo";
-import { Menu, X } from "lucide-react";
+import { Menu, ShoppingBag, X } from "lucide-react";
+import { usePremiumUI } from "@/components/providers/PremiumUIProvider";
 
 export function Navbar() {
     const [scrolled, setScrolled] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const { cartCount, openCart, openBooking } = usePremiumUI();
 
     useEffect(() => {
         const onScroll = () => setScrolled(window.scrollY > 20);
@@ -25,7 +27,7 @@ export function Navbar() {
             <nav className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 md:px-8">
                 <Link href="/" className="flex items-center gap-3">
                     <BrandLogo />
-                    <span className="font-[var(--font-heading)] text-lg tracking-[0.22em] text-[#F5F5F5]">CAFE MAZA</span>
+                    <span className="font-(--font-heading) text-lg tracking-[0.22em] text-[#F5F5F5]">CAFE MAZA</span>
                 </Link>
 
                 <ul className="hidden items-center gap-5 lg:flex">
@@ -33,13 +35,31 @@ export function Navbar() {
                         <li key={item.href}>
                             <Link href={item.href} className="group relative text-sm tracking-wide text-[#F5F5F5]/88">
                                 {item.label}
-                                <span className="absolute -bottom-1 left-0 h-px w-0 bg-gradient-to-r from-[#CFAF63] to-[#FF6A00] transition-all duration-300 group-hover:w-full" />
+                                <span className="absolute -bottom-1 left-0 h-px w-0 bg-linear-to-r from-[#CFAF63] to-[#FF6A00] transition-all duration-300 group-hover:w-full" />
                             </Link>
                         </li>
                     ))}
                 </ul>
 
                 <div className="flex items-center gap-2">
+                    <button
+                        onClick={openBooking}
+                        className="hidden rounded-full border border-[#CFAF63]/40 px-4 py-2 text-xs text-[#F5F5F5] transition hover:border-[#FF6A00] sm:block"
+                    >
+                        Book Table
+                    </button>
+                    <button
+                        onClick={openCart}
+                        className="relative rounded-full border border-[#CFAF63]/30 p-2 text-[#F5F5F5] transition hover:border-[#FF6A00]"
+                        aria-label="Open cart"
+                    >
+                        <ShoppingBag size={16} />
+                        {cartCount > 0 ? (
+                            <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-[#FF6A00] px-1 text-[10px] font-semibold text-white">
+                                {cartCount}
+                            </span>
+                        ) : null}
+                    </button>
                     <motion.div whileHover={{ y: -2 }} className="hidden sm:block">
                         <Link href="/login" className="rounded-full border border-[#CFAF63]/40 px-4 py-2 text-xs text-[#F5F5F5]">
                             Login
@@ -77,6 +97,16 @@ export function Navbar() {
                                     </Link>
                                 </li>
                             ))}
+                            <li className="py-3 border-b border-[#CFAF63]/10">
+                                <button onClick={() => { setMobileMenuOpen(false); openBooking(); }} className="block text-sm text-[#F5F5F5]/88">
+                                    Book Table
+                                </button>
+                            </li>
+                            <li className="py-3 border-b border-[#CFAF63]/10">
+                                <button onClick={() => { setMobileMenuOpen(false); openCart(); }} className="block text-sm text-[#F5F5F5]/88">
+                                    Cart ({cartCount})
+                                </button>
+                            </li>
                             <li className="py-3 border-b border-[#CFAF63]/10">
                                 <Link href="/login" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-[#F5F5F5]/88">
                                     Login
