@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { LuxuryButton } from "@/components/ui/LuxuryButton";
 import { usePremiumUI } from "@/components/providers/PremiumUIProvider";
+import { apiFetch } from "@/lib/api";
 
 type Table = {
     id: number;
@@ -18,6 +19,10 @@ export function ReserveTableClient({ tables }: ReserveTableClientProps) {
     const [selectedTable, setSelectedTable] = useState<number | null>(null);
     const [showConfirmation, setShowConfirmation] = useState(false);
     const [submitted, setSubmitted] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState("");
+    const [bookedTables, setBookedTables] = useState<number[]>([]);
+    const [loadingAvailability, setLoadingAvailability] = useState(false);
     const { pushToast } = usePremiumUI();
     const [form, setForm] = useState({ name: "", phone: "", guests: "2", date: "", time: "", request: "" });
 
@@ -28,12 +33,65 @@ export function ReserveTableClient({ tables }: ReserveTableClientProps) {
 
     const timeSlots = ["18:00", "19:00", "20:00", "21:00", "22:00", "23:00"];
 
-    const submitReservation = () => {
+    useEffect(() => {
+        async function loadAvailability() {
+            if (!form.date || !form.time) {
+                setBookedTables([]);
+                return;
+            }
+
+            try {
+                setLoadingAvailability(true);
+                const availability = await apiFetch<{ bookedTables: number[] }>(
+                    `/api/reservations/availability?date=${encodeURIComponent(form.date)}&time=${encodeURIComponent(form.time)}`
+                );
+                setBookedTables(Array.isArray(availability.bookedTables) ? availability.bookedTables : []);
+            } catch {
+                setBookedTables([]);
+            } finally {
+                setLoadingAvailability(false);
+            }
+        }
+
+        void loadAvailability();
+    }, [form.date, form.time]);
+
+    useEffect(() => {
+        if (selectedTable && bookedTables.includes(selectedTable)) {
+            setSelectedTable(null);
+            setError(`Table T${selectedTable} is already booked for this time slot.`);
+        }
+    }, [bookedTables, selectedTable]);
+
+    const submitReservation = async () => {
         setSubmitted(true);
+        setError("");
         if (!isValid) return;
 
-        setShowConfirmation(true);
-        pushToast("Table reserved successfully");
+        try {
+            setSaving(true);
+            await apiFetch("/api/reservations", {
+                method: "POST",
+                body: JSON.stringify({
+                    name: form.name,
+                    phone: form.phone,
+                    guests: Number(form.guests),
+                    date: form.date,
+                    time: form.time,
+                    tableNumber: selectedTable,
+                    specialRequest: form.request,
+                }),
+            });
+
+            setShowConfirmation(true);
+            pushToast("Table reserved successfully");
+        } catch (requestError) {
+            const message = requestError instanceof Error ? requestError.message : "Reservation failed";
+            setError(message);
+            pushToast(message);
+        } finally {
+            setSaving(false);
+        }
     };
 
     return (
@@ -102,6 +160,15 @@ export function ReserveTableClient({ tables }: ReserveTableClientProps) {
                         </select>
                         {submitted && !form.time ? <span className="mt-1 block text-xs text-[#FF6A00]">Time slot is required.</span> : null}
                     </label>
+                    {form.date && form.time ? (
+                        <p className="text-xs text-[#F5F5F5]/70">
+                            {loadingAvailability
+                                ? "Checking table availability..."
+                                : bookedTables.length > 0
+                                    ? `Booked tables for ${form.time}: ${bookedTables.map((tableId) => `T${tableId}`).join(", ")}`
+                                    : "All tables are currently available for this slot."}
+                        </p>
+                    ) : null}
                     <label className="block text-sm text-[#F5F5F5]/75">
                         Special Request
                         <textarea
@@ -113,9 +180,10 @@ export function ReserveTableClient({ tables }: ReserveTableClientProps) {
                         />
                     </label>
                     <LuxuryButton className="w-full py-3" onClick={submitReservation}>
-                        Confirm Reservation
+                        {saving ? "Saving..." : "Confirm Reservation"}
                     </LuxuryButton>
                     {submitted && !selectedTable ? <p className="text-xs text-[#FF6A00]">Select a table to continue.</p> : null}
+                    {error ? <p className="text-xs text-rose-300">{error}</p> : null}
                 </form>
             </section>
 
@@ -125,14 +193,25 @@ export function ReserveTableClient({ tables }: ReserveTableClientProps) {
                     {tables.map((table) => (
                         <button
                             key={table.id}
-                            onClick={() => setSelectedTable(table.id)}
+                            type="button"
+                            onClick={() => {
+                                if (bookedTables.includes(table.id)) {
+                                    pushToast(`Table T${table.id} is already booked`);
+                                    return;
+                                }
+                                setSelectedTable(table.id);
+                            }}
+                            disabled={bookedTables.includes(table.id)}
                             className={`rounded-2xl border p-4 text-center transition ${selectedTable === table.id
                                 ? "border-[#FF6A00] bg-[#FF6A00]/20 shadow-[0_0_18px_rgba(255,106,0,0.45)]"
-                                : "border-[#CFAF63]/20 bg-[#161616] hover:-translate-y-1"
+                                : bookedTables.includes(table.id)
+                                    ? "border-rose-400/35 bg-rose-500/10 opacity-70 cursor-not-allowed"
+                                    : "border-[#CFAF63]/20 bg-[#161616] hover:-translate-y-1"
                                 }`}
                         >
                             <p className="font-(--font-heading) text-2xl">T{table.id}</p>
                             <p className="text-xs text-[#F5F5F5]/70">{table.seats} Seats</p>
+                            {bookedTables.includes(table.id) ? <p className="mt-1 text-[10px] font-semibold text-rose-300">Already booked</p> : null}
                         </button>
                     ))}
                 </div>

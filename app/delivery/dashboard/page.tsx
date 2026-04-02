@@ -1,186 +1,397 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { LogOut, Navigation, Zap, Truck, Home } from "lucide-react";
-import { mockDeliveries } from "@/data/mockData";
+import { LogOut, Navigation, PackageCheck, Truck } from "lucide-react";
 
-type DeliveryStatus = "assigned" | "picked-up" | "out-for-delivery" | "delivered";
+import { apiFetch } from "@/lib/api";
+import { clearAuthSession, getAuthToken, getAuthUser } from "@/lib/authToken";
+import { socket } from "@/lib/socket";
+
+type DeliveryOrder = {
+    _id: string;
+    status: "placed" | "preparing" | "ready" | "out_for_delivery" | "delivered";
+    address: string;
+    userId?: { name?: string; email?: string };
+    items: Array<{ quantity: number; menuItemId?: { name?: string } }>;
+    deliveryPartnerId?: { _id?: string; name?: string; phone?: string } | null;
+};
+
+type Tab = "available" | "assigned" | "delivered";
 
 export default function DeliveryDashboard() {
     const router = useRouter();
-    const [deliveryInfo, setDeliveryInfo] = useState<{ deliveryId: string; name: string; phone: string } | null>(null);
-    const [deliveries, setDeliveries] = useState(mockDeliveries);
-    const [activeTab, setActiveTab] = useState<DeliveryStatus>("assigned");
+    const [tab, setTab] = useState<Tab>("available");
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
+    const [partnerName, setPartnerName] = useState("");
+    const [availableOrders, setAvailableOrders] = useState<DeliveryOrder[]>([]);
+    const [myOrders, setMyOrders] = useState<DeliveryOrder[]>([]);
+    const [pendingDeliveryOrder, setPendingDeliveryOrder] = useState<DeliveryOrder | null>(null);
+    const [deliveryOtp, setDeliveryOtp] = useState("");
+    const [searchQuery, setSearchQuery] = useState("");
+    const [currentPage, setCurrentPage] = useState(1);
+
+    const PAGE_SIZE = 6;
+
+    const assignedOrders = useMemo(
+        () => myOrders.filter((order) => order.status === "ready" || order.status === "out_for_delivery"),
+        [myOrders],
+    );
+
+    const deliveredOrders = useMemo(() => myOrders.filter((order) => order.status === "delivered"), [myOrders]);
 
     useEffect(() => {
-        const delivery = localStorage.getItem("deliveryLoggedIn");
-        if (!delivery) {
+        const user = getAuthUser();
+
+        if (!user || (user.role !== "delivery" && user.role !== "admin")) {
             router.push("/delivery-login");
             return;
         }
-        setDeliveryInfo(JSON.parse(delivery));
+
+        setPartnerName(user.name || "Delivery Partner");
     }, [router]);
 
+    const loadOrders = async () => {
+        const token = getAuthToken();
+        if (!token) return;
+
+        setLoading(true);
+        setError("");
+
+        try {
+            const [available, mine] = await Promise.all([
+                apiFetch<DeliveryOrder[]>("/api/orders/delivery/available", { token }),
+                apiFetch<DeliveryOrder[]>("/api/orders/delivery/mine", { token }),
+            ]);
+
+            setAvailableOrders(available);
+            setMyOrders(mine);
+        } catch (requestError) {
+            setError(requestError instanceof Error ? requestError.message : "Failed to load delivery orders");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        void loadOrders();
+
+        if (!socket.connected) {
+            socket.connect();
+        }
+
+        const refreshOrders = () => {
+            void loadOrders();
+        };
+
+        socket.on("order_created", refreshOrders);
+        socket.on("order_status_updated", refreshOrders);
+
+        const timer = window.setInterval(refreshOrders, 10000);
+
+        return () => {
+            socket.off("order_created", refreshOrders);
+            socket.off("order_status_updated", refreshOrders);
+            window.clearInterval(timer);
+        };
+    }, []);
+
+    const takeOrder = async (orderId: string) => {
+        const token = getAuthToken();
+        if (!token) return;
+
+        setError("");
+
+        try {
+            await apiFetch(`/api/orders/${orderId}/take`, {
+                method: "PUT",
+                token,
+            });
+
+            await loadOrders();
+            setTab("assigned");
+        } catch (requestError) {
+            setError(requestError instanceof Error ? requestError.message : "Failed to take order");
+        }
+    };
+
+    const updateStatus = async (orderId: string, status: "out_for_delivery" | "delivered", otp?: string) => {
+        const token = getAuthToken();
+        if (!token) return;
+
+        setError("");
+
+        try {
+            await apiFetch(`/api/orders/${orderId}/status`, {
+                method: "PUT",
+                token,
+                body: JSON.stringify({ status, otp }),
+            });
+
+            await loadOrders();
+            return true;
+        } catch (requestError) {
+            setError(requestError instanceof Error ? requestError.message : "Failed to update order status");
+            return false;
+        }
+    };
+
+    const openDeliveredDialog = (order: DeliveryOrder) => {
+        setPendingDeliveryOrder(order);
+        setDeliveryOtp("");
+        setError("");
+    };
+
+    const confirmDelivered = async () => {
+        if (!pendingDeliveryOrder) {
+            return;
+        }
+
+        if (!deliveryOtp.trim()) {
+            setError("Enter the OTP shared by the customer");
+            return;
+        }
+
+        const updated = await updateStatus(pendingDeliveryOrder._id, "delivered", deliveryOtp.trim());
+
+        if (!updated) {
+            return;
+        }
+
+        setPendingDeliveryOrder(null);
+        setDeliveryOtp("");
+    };
+
     const handleLogout = () => {
-        localStorage.removeItem("deliveryLoggedIn");
+        clearAuthSession();
         router.push("/delivery-login");
     };
 
-    const updateDeliveryStatus = (deliveryId: string, newStatus: DeliveryStatus) => {
-        setDeliveries(deliveries.map((del) => (del.id === deliveryId ? { ...del, status: newStatus } : del)));
-    };
+    const cards: Array<{ id: Tab; label: string; count: number }> = [
+        { id: "available", label: "Available Orders", count: availableOrders.length },
+        { id: "assigned", label: "My Active Orders", count: assignedOrders.length },
+        { id: "delivered", label: "Delivered", count: deliveredOrders.length },
+    ];
 
-    const getDeliveriesByStatus = (status: DeliveryStatus) => deliveries.filter((del) => del.status === status);
+    const list = tab === "available" ? availableOrders : tab === "assigned" ? assignedOrders : deliveredOrders;
 
-    const statusConfig = {
-        assigned: { icon: Zap, label: "Assigned Orders", color: "text-[#FF6A00]", bg: "bg-[#FF6A00]/10", border: "border-[#FF6A00]/25" },
-        "picked-up": { icon: Truck, label: "Picked Up", color: "text-[#CFAF63]", bg: "bg-[#CFAF63]/10", border: "border-[#CFAF63]/25" },
-        "out-for-delivery": { icon: Navigation, label: "Out for Delivery", color: "text-[#3B82F6]", bg: "bg-[#3B82F6]/10", border: "border-[#3B82F6]/25" },
-        delivered: { icon: Home, label: "Delivered", color: "text-[#00D98E]", bg: "bg-[#00D98E]/10", border: "border-[#00D98E]/25" },
-    };
+    const filteredList = useMemo(() => {
+        const query = searchQuery.trim().toLowerCase();
+        if (!query) {
+            return list;
+        }
 
-    if (!deliveryInfo) return null;
+        return list.filter((order) => {
+            const customerName = order.userId?.name || order.userId?.email || "";
+            const orderCode = order._id.slice(-6).toLowerCase();
+            const itemText = order.items.map((item) => item.menuItemId?.name || "").join(" ").toLowerCase();
+            const address = order.address.toLowerCase();
 
-    const tabs: DeliveryStatus[] = ["assigned", "picked-up", "out-for-delivery", "delivered"];
-    const currentDeliveries = getDeliveriesByStatus(activeTab);
+            return (
+                customerName.toLowerCase().includes(query) ||
+                orderCode.includes(query) ||
+                itemText.includes(query) ||
+                address.includes(query)
+            );
+        });
+    }, [list, searchQuery]);
+
+    const totalPages = Math.max(1, Math.ceil(filteredList.length / PAGE_SIZE));
+    const paginatedList = useMemo(() => {
+        const start = (currentPage - 1) * PAGE_SIZE;
+        return filteredList.slice(start, start + PAGE_SIZE);
+    }, [filteredList, currentPage]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [tab, searchQuery]);
+
+    useEffect(() => {
+        if (currentPage > totalPages) {
+            setCurrentPage(totalPages);
+        }
+    }, [currentPage, totalPages]);
 
     return (
         <div className="min-h-screen bg-[#0B0B0B] p-6">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-8">
+            <div className="mb-8 flex items-center justify-between">
                 <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
-                    <p className="text-sm uppercase tracking-[0.2em] text-[#FF6A00]">Welcome,</p>
-                    <h1 className="font-[var(--font-heading)] text-4xl text-[#F5F5F5]">{deliveryInfo.name}</h1>
-                    <p className="text-sm text-[#999] mt-1">ID: {deliveryInfo.deliveryId}</p>
+                    <p className="text-sm uppercase tracking-[0.2em] text-[#FF6A00]">Delivery Hub</p>
+                    <h1 className="font-[var(--font-heading)] text-4xl text-[#F5F5F5]">{partnerName}</h1>
+                    <p className="mt-1 text-sm text-[#999]">Take orders, start live tracking, and mark deliveries.</p>
                 </motion.div>
                 <button
                     onClick={handleLogout}
-                    className="flex items-center gap-2 px-4 py-2 rounded-full bg-[#FF6A00]/20 text-[#FF6A00] hover:bg-[#FF6A00]/30 transition"
+                    className="flex items-center gap-2 rounded-full bg-[#FF6A00]/20 px-4 py-2 text-[#FF6A00] hover:bg-[#FF6A00]/30 transition"
                 >
                     <LogOut size={18} />
                     Logout
                 </button>
             </div>
 
-            {/* Status Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                {tabs.map((tab) => {
-                    const count = getDeliveriesByStatus(tab).length;
-                    const config = statusConfig[tab];
-                    const Icon = config.icon;
-                    return (
-                        <motion.button
-                            key={tab}
-                            onClick={() => setActiveTab(tab)}
-                            whileHover={{ scale: 1.05 }}
-                            className={`glass-card border p-4 rounded-2xl text-left transition ${activeTab === tab
-                                    ? `border-[#CFAF63] ${config.bg}`
-                                    : `border-[#333] hover:border-[#CFAF63]/50`
-                                }`}
-                        >
-                            <div className="flex items-center justify-between">
+            <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+                {cards.map((card) => (
+                    <button
+                        key={card.id}
+                        onClick={() => setTab(card.id)}
+                        className={`rounded-2xl border p-4 text-left transition ${tab === card.id
+                            ? "border-[#CFAF63] bg-[#CFAF63]/10"
+                            : "border-[#333] bg-[#111] hover:border-[#CFAF63]/40"
+                            }`}
+                    >
+                        <p className="text-xs uppercase tracking-[0.12em] text-[#999]">{card.label}</p>
+                        <p className="mt-2 text-3xl font-bold text-[#F5F5F5]">{card.count}</p>
+                    </button>
+                ))}
+            </div>
+
+            {error ? <p className="mb-4 text-sm text-rose-300">{error}</p> : null}
+            {loading ? <p className="text-[#F5F5F5]/70">Loading delivery orders...</p> : null}
+
+            <div className="mb-4">
+                <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    placeholder="Search by customer, order id, item, or address"
+                    className="w-full rounded-2xl border border-[#CFAF63]/25 bg-[#111] px-4 py-3 text-sm text-[#F5F5F5] placeholder-[#777] outline-none"
+                />
+            </div>
+
+            {!loading && filteredList.length === 0 ? (
+                <div className="glass-card rounded-2xl border border-[#333] p-8 text-center text-[#999]">No orders in this section.</div>
+            ) : null}
+
+            {!loading && filteredList.length > 0 ? (
+                <p className="mb-3 text-xs text-[#999]">
+                    Showing {(currentPage - 1) * PAGE_SIZE + 1}-{Math.min(currentPage * PAGE_SIZE, filteredList.length)} of {filteredList.length}
+                </p>
+            ) : null}
+
+            <div className="space-y-4">
+                {!loading &&
+                    paginatedList.map((order) => (
+                        <div key={order._id} className="glass-card rounded-2xl border border-[#CFAF63]/25 p-5">
+                            <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
                                 <div>
-                                    <p className="text-xs uppercase tracking-[0.15em] text-[#999]">{config.label}</p>
-                                    <p className={`text-3xl font-bold mt-2 ${config.color}`}>{count}</p>
+                                    <p className="text-xs uppercase tracking-[0.1em] text-[#999]">Customer</p>
+                                    <p className="text-[#F5F5F5]">{order.userId?.name || order.userId?.email || "Customer"}</p>
                                 </div>
-                                <Icon className={`${config.color}`} size={24} />
+                                <div>
+                                    <p className="text-xs uppercase tracking-[0.1em] text-[#999]">Order</p>
+                                    <p className="text-[#CFAF63]">#{order._id.slice(-6).toUpperCase()}</p>
+                                </div>
                             </div>
-                        </motion.button>
-                    );
-                })}
+
+                            <div className="mb-4">
+                                <p className="text-xs uppercase tracking-[0.1em] text-[#999]">Items</p>
+                                <p className="text-sm text-[#CCC]">
+                                    {order.items.map((item) => `${item.menuItemId?.name || "Item"} x${item.quantity}`).join(", ")}
+                                </p>
+                            </div>
+
+                            <div className="mb-5">
+                                <p className="text-xs uppercase tracking-[0.1em] text-[#999]">Delivery Address</p>
+                                <p className="text-sm text-[#F5F5F5]">{order.address}</p>
+                            </div>
+
+                            {tab === "available" ? (
+                                <button
+                                    onClick={() => takeOrder(order._id)}
+                                    className="w-full rounded-lg bg-gradient-to-r from-[#CFAF63] to-[#FF6A00] px-4 py-2 font-semibold text-[#111] hover:shadow-lg"
+                                >
+                                    <PackageCheck size={16} className="mr-2 inline" />
+                                    Take This Order
+                                </button>
+                            ) : null}
+
+                            {tab === "assigned" ? (
+                                <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+                                    <button
+                                        onClick={() => updateStatus(order._id, "out_for_delivery")}
+                                        className="rounded-lg bg-[#3B82F6]/20 px-4 py-2 font-semibold text-[#6CA3EA] hover:bg-[#3B82F6]/30"
+                                    >
+                                        <Truck size={16} className="mr-1 inline" />
+                                        Out for Delivery
+                                    </button>
+                                    <button
+                                        onClick={() => router.push(`/delivery/tracking/${order._id}`)}
+                                        className="rounded-lg border border-[#CFAF63]/40 px-4 py-2 font-semibold text-[#CFAF63] hover:bg-[#CFAF63]/10"
+                                    >
+                                        <Navigation size={16} className="mr-1 inline" />
+                                        Live Tracking
+                                    </button>
+                                    <button
+                                        onClick={() => openDeliveredDialog(order)}
+                                        className="rounded-lg bg-[#00D98E]/20 px-4 py-2 font-semibold text-[#00D98E] hover:bg-[#00D98E]/30"
+                                    >
+                                        Mark Delivered
+                                    </button>
+                                </div>
+                            ) : null}
+                        </div>
+                    ))}
             </div>
 
-            {/* Deliveries Grid */}
-            <div>
-                <h2 className="font-[var(--font-heading)] text-2xl text-[#F5F5F5] mb-4">
-                    {statusConfig[activeTab].label}
-                </h2>
+            {!loading && filteredList.length > PAGE_SIZE ? (
+                <div className="mt-6 flex items-center justify-center gap-2">
+                    <button
+                        onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                        disabled={currentPage === 1}
+                        className="rounded-full border border-[#CFAF63]/30 px-4 py-2 text-xs text-[#F5F5F5] disabled:opacity-40"
+                    >
+                        Prev
+                    </button>
+                    <span className="text-xs text-[#999]">Page {currentPage} / {totalPages}</span>
+                    <button
+                        onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                        disabled={currentPage === totalPages}
+                        className="rounded-full border border-[#CFAF63]/30 px-4 py-2 text-xs text-[#F5F5F5] disabled:opacity-40"
+                    >
+                        Next
+                    </button>
+                </div>
+            ) : null}
 
-                {currentDeliveries.length === 0 ? (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="glass-card rounded-2xl border border-[#333] p-8 text-center"
-                    >
-                        <p className="text-[#999]">No deliveries in this status</p>
-                    </motion.div>
-                ) : (
-                    <motion.div
-                        layout
-                        className="space-y-4"
-                    >
-                        {currentDeliveries.map((delivery, idx) => (
-                            <motion.div
-                                key={delivery.id}
-                                initial={{ opacity: 0, x: 20 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                transition={{ delay: idx * 0.05 }}
-                                className="glass-card rounded-2xl border border-[#CFAF63]/25 p-6 hover:border-[#CFAF63]/50 transition"
+            {pendingDeliveryOrder ? (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+                    <div className="w-full max-w-md rounded-3xl border border-[#CFAF63]/25 bg-[#101010] p-6 shadow-2xl">
+                        <p className="text-sm uppercase tracking-[0.2em] text-[#CFAF63]">Confirm Delivery</p>
+                        <h2 className="mt-2 font-[var(--font-heading)] text-3xl text-[#F5F5F5]">Enter OTP</h2>
+                        <p className="mt-2 text-sm text-[#999]">
+                            Ask the customer for the code shown on their tracking page.
+                        </p>
+                        <input
+                            type="text"
+                            inputMode="numeric"
+                            value={deliveryOtp}
+                            onChange={(event) => setDeliveryOtp(event.target.value)}
+                            placeholder="Enter OTP"
+                            className="mt-5 w-full rounded-2xl border border-[#CFAF63]/25 bg-[#121212] px-4 py-3 text-[#F5F5F5] outline-none"
+                        />
+                        <div className="mt-5 flex gap-3">
+                            <button
+                                onClick={() => {
+                                    setPendingDeliveryOrder(null);
+                                    setDeliveryOtp("");
+                                }}
+                                className="flex-1 rounded-full border border-[#CFAF63]/25 px-4 py-3 text-[#F5F5F5]"
                             >
-                                {/* Delivery Header */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6 pb-6 border-b border-[#333]">
-                                    {/* Left: Customer Info */}
-                                    <div>
-                                        <p className="text-xs uppercase tracking-[0.1em] text-[#CFAF63] mb-2">Customer</p>
-                                        <p className="font-semibold text-[#F5F5F5] text-lg">{delivery.customerName}</p>
-                                        <p className="text-sm text-[#999]">📞 {delivery.customerPhone}</p>
-                                        <p className="text-xs text-[#666] mt-2">Delivery ID: {delivery.deliveryId}</p>
-                                    </div>
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => void confirmDelivered()}
+                                className="flex-1 rounded-full bg-[#00D98E] px-4 py-3 font-semibold text-[#111]"
+                            >
+                                Confirm
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
 
-                                    {/* Right: Order Info */}
-                                    <div>
-                                        <p className="text-xs uppercase tracking-[0.1em] text-[#FF6A00] mb-2">Order</p>
-                                        <p className="font-semibold text-[#F5F5F5]">Order #{delivery.orderId}</p>
-                                        <p className="text-sm text-[#CFAF63]">Items: {delivery.items.join(", ")}</p>
-                                    </div>
-                                </div>
-
-                                {/* Address Info */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 pb-6 border-b border-[#333]">
-                                    <div>
-                                        <p className="text-xs uppercase tracking-[0.1em] text-[#999] mb-1">Pickup Location</p>
-                                        <p className="text-sm text-[#CCC]">{delivery.pickupAddress}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-xs uppercase tracking-[0.1em] text-[#999] mb-1">Delivery Address</p>
-                                        <p className="text-sm text-[#CCC]">{delivery.deliveryAddress}</p>
-                                    </div>
-                                </div>
-
-                                {/* Action Buttons */}
-                                <div className="space-y-2">
-                                    {activeTab === "assigned" && (
-                                        <button
-                                            onClick={() => updateDeliveryStatus(delivery.id, "picked-up")}
-                                            className="w-full py-2 bg-gradient-to-r from-[#CFAF63] to-[#FF6A00] text-[#111] rounded-lg font-semibold hover:shadow-lg transition text-sm"
-                                        >
-                                            📦 Mark as Picked Up
-                                        </button>
-                                    )}
-                                    {activeTab === "picked-up" && (
-                                        <button
-                                            onClick={() => updateDeliveryStatus(delivery.id, "out-for-delivery")}
-                                            className="w-full py-2 bg-gradient-to-r from-[#3B82F6] to-[#60A5FA] text-white rounded-lg font-semibold hover:shadow-lg transition text-sm"
-                                        >
-                                            🚗 Out for Delivery
-                                        </button>
-                                    )}
-                                    {activeTab === "out-for-delivery" && (
-                                        <button
-                                            onClick={() => updateDeliveryStatus(delivery.id, "delivered")}
-                                            className="w-full py-2 bg-[#00D98E]/20 text-[#00D98E] rounded-lg font-semibold hover:bg-[#00D98E]/30 transition text-sm"
-                                        >
-                                            ✓ Mark Delivered
-                                        </button>
-                                    )}
-                                </div>
-                            </motion.div>
-                        ))}
-                    </motion.div>
-                )}
-            </div>
         </div>
     );
 }

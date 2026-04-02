@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Monitor, Users, Cake, Music, Film, Tv, ChevronRight, Check } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { ScreeningBooking } from "@/data/mockData";
+import { apiFetch } from "@/lib/api";
 
 type BookingFormData = {
     name: string;
@@ -105,6 +106,8 @@ export function ScreeningBookingModal({ onClose }: ScreeningBookingModalProps) {
     const [step, setStep] = useState<"layout" | "form" | "confirm">("layout");
     const [form, setForm] = useState<BookingFormData>(INITIAL_FORM);
     const [errors, setErrors] = useState<Partial<Record<keyof BookingFormData, string>>>({});
+    const [saving, setSaving] = useState(false);
+    const [requestError, setRequestError] = useState("");
 
     // Close on Escape key
     useEffect(() => {
@@ -129,18 +132,40 @@ export function ScreeningBookingModal({ onClose }: ScreeningBookingModalProps) {
         return Object.keys(newErrors).length === 0;
     };
 
-    const handleSubmit = () => {
-        if (validate()) {
-            // Save to localStorage for demo
-            const existing: ScreeningBooking[] = JSON.parse(localStorage.getItem("screeningBookings") || "[]");
-            const newBooking: ScreeningBooking = {
-                id: `sc_${Date.now()}`,
-                ...form,
-                status: "pending",
-                createdAt: new Date(),
+    const handleSubmit = async () => {
+        setRequestError("");
+
+        if (!validate()) {
+            return;
+        }
+
+        try {
+            setSaving(true);
+
+            const contentTypeMap: Record<ScreeningBooking["contentType"], "movie" | "sports" | "custom"> = {
+                "Movie": "movie",
+                "Sports Match": "sports",
+                "Custom Content": "custom",
             };
-            localStorage.setItem("screeningBookings", JSON.stringify([...existing, newBooking]));
+
+            await apiFetch("/api/screening", {
+                method: "POST",
+                body: JSON.stringify({
+                    name: form.name,
+                    phone: form.phone,
+                    guests: form.guests,
+                    date: form.date,
+                    time: form.time,
+                    occasion: form.occasion,
+                    contentType: contentTypeMap[form.contentType],
+                }),
+            });
+
             setStep("confirm");
+        } catch (error) {
+            setRequestError(error instanceof Error ? error.message : "Failed to create booking");
+        } finally {
+            setSaving(false);
         }
     };
 
@@ -380,10 +405,12 @@ export function ScreeningBookingModal({ onClose }: ScreeningBookingModalProps) {
                             onClick={handleSubmit}
                             whileHover={{ scale: 1.03 }}
                             whileTap={{ scale: 0.97 }}
+                            disabled={saving}
                             className="mt-6 w-full flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#CFAF63] to-[#FF6A00] py-3.5 font-semibold text-[#111] hover:shadow-[0_0_30px_rgba(207,175,99,0.4)] transition"
                         >
-                            Confirm Booking <ChevronRight size={18} />
+                            {saving ? "Booking..." : "Confirm Booking"} <ChevronRight size={18} />
                         </motion.button>
+                        {requestError ? <p className="mt-2 text-xs text-rose-300">{requestError}</p> : null}
                     </motion.div>
                 )}
 

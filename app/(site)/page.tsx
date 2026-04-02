@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { HeroSection } from "@/components/hero/HeroSection";
 import { DishCard } from "@/components/ui/DishCard";
@@ -11,10 +11,64 @@ import { GoldDivider } from "@/components/ui/GoldDivider";
 import { ScreeningBookingModal } from "@/components/ui/ScreeningBookingModal";
 import { TestimonialsCarousel } from "@/components/ui/TestimonialsCarousel";
 import { ChefStorySection } from "@/components/ui/ChefStorySection";
-import { featuredDishes, grillFeatures, menuCategories, premiumPhotos } from "@/data/mockData";
+import { featuredDishes, grillFeatures, menuCategories, premiumPhotos, type Dish } from "@/data/mockData";
+import { apiFetch } from "@/lib/api";
+
+type BackendMenuItem = {
+    _id: string;
+    name: string;
+    category: string;
+    price: number;
+    image?: string;
+    isVeg?: boolean;
+    isPopular?: boolean;
+    isBestSeller?: boolean;
+    isSoldOut?: boolean;
+    tags?: string[];
+};
 
 export default function HomePage() {
     const [showScreeningModal, setShowScreeningModal] = useState(false);
+    const [signatureDishes, setSignatureDishes] = useState<Dish[]>(featuredDishes);
+
+    useEffect(() => {
+        let mounted = true;
+
+        async function loadSignatureDishes() {
+            try {
+                const items = await apiFetch<BackendMenuItem[]>("/api/menu");
+                if (!items.length || !mounted) return;
+
+                const featuredPool = items.some((item) => item.isPopular)
+                    ? items.filter((item) => Boolean(item.isPopular))
+                    : items.filter((item) => Boolean(item.isBestSeller));
+
+                const featured = featuredPool
+                    .slice(0, 6)
+                    .map((item) => ({
+                        name: item.name,
+                        price: item.price,
+                        image: item.image || "/images/soup.jpg",
+                        isVeg: item.isVeg,
+                        isBestSeller: item.isBestSeller ?? item.isPopular,
+                        isSoldOut: item.isSoldOut,
+                        tags: item.tags,
+                    } satisfies Dish));
+
+                if (featured.length > 0) {
+                    setSignatureDishes(featured);
+                }
+            } catch {
+                // Keep local fallback list when backend is unavailable.
+            }
+        }
+
+        loadSignatureDishes();
+
+        return () => {
+            mounted = false;
+        };
+    }, []);
 
     const ctaActions = [
         { title: "Reserve a Table", subtitle: "Book your premium dining experience", href: "/reserve-table", icon: "🍽️" },
@@ -63,7 +117,7 @@ export default function HomePage() {
                     <GoldDivider className="max-w-sm" />
                 </div>
                 <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-                    {featuredDishes.map((dish) => (
+                    {signatureDishes.map((dish) => (
                         <DishCard key={dish.name} dish={dish} />
                     ))}
                 </div>

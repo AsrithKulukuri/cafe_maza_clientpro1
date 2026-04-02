@@ -3,6 +3,10 @@
     price: number;
     image: string;
     description?: string;
+    isVeg?: boolean;
+    isBestSeller?: boolean;
+    isSoldOut?: boolean;
+    tags?: string[];
 };
 
 export type MenuCategory = {
