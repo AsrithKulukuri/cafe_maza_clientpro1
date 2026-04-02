@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
+import { apiFetch } from "@/lib/api";
+import { setAuthSession } from "@/lib/authToken";
 
 export default function AdminLoginPage() {
     const [adminEmail, setAdminEmail] = useState("");
@@ -10,13 +12,34 @@ export default function AdminLoginPage() {
     const [error, setError] = useState("");
     const router = useRouter();
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (adminEmail.trim() && password.trim()) {
-            localStorage.setItem("adminLoggedIn", JSON.stringify({ adminEmail, name: "Admin Manager", email: adminEmail }));
-            router.push("/admin/dashboard");
-        } else {
+        if (!adminEmail.trim() || !password.trim()) {
             setError("Please fill in all fields");
+            return;
+        }
+
+        try {
+            const response = await apiFetch<{ token: string; user: { id: string; name: string; email: string; role: string } }>("/api/auth/login", {
+                method: "POST",
+                body: JSON.stringify({ email: adminEmail, password }),
+            });
+
+            if (response.user.role !== "admin") {
+                setError("Only admin accounts can access this portal");
+                return;
+            }
+
+            setAuthSession(response.token, {
+                id: response.user.id,
+                name: response.user.name,
+                email: response.user.email,
+                role: "admin",
+            });
+
+            router.push("/admin/dashboard");
+        } catch (requestError) {
+            setError(requestError instanceof Error ? requestError.message : "Login failed");
         }
     };
 
@@ -55,7 +78,7 @@ export default function AdminLoginPage() {
                 </div>
 
                 <p className="mt-6 text-center text-xs text-[#999]">
-                    Demo: Use any admin email with any password
+                    Use backend admin credentials created via /api/auth/register
                 </p>
             </motion.form>
         </div>

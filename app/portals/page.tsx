@@ -13,6 +13,7 @@ const portals = [
         links: [
             { label: "Login", href: "/login" },
             { label: "Sign Up", href: "/signup" },
+            { label: "My Orders", href: "/my-orders" },
             { label: "Track Order", href: "/order-tracking" },
         ],
         color: "from-[#FF6A00]",
@@ -98,8 +99,8 @@ export default function PortalsPage() {
                                         key={link.href}
                                         href={link.href}
                                         className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${link.label.includes("Login") || link.label.includes("Sign Up")
-                                                ? `bg-gradient-to-r ${portal.color} to-[#FF6A00] text-[#111] hover:shadow-lg`
-                                                : "border border-[#CFAF63]/25 text-[#CFAF63] hover:bg-[#CFAF63]/10"
+                                            ? `bg-gradient-to-r ${portal.color} to-[#FF6A00] text-[#111] hover:shadow-lg`
+                                            : "border border-[#CFAF63]/25 text-[#CFAF63] hover:bg-[#CFAF63]/10"
                                             }`}
                                     >
                                         {link.label}

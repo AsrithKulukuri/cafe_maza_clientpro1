@@ -1,8 +1,30 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+This is a [Next.js](https://nextjs.org) project for Cafe Maza.
 
 ## Getting Started
 
-First, run the development server:
+1. Install dependencies:
+
+```bash
+npm install
+```
+
+2. Copy the environment template and fill values:
+
+```bash
+cp .env.example .env.local
+```
+
+3. Run the SQL in `supabase/user_profiles.sql` inside your Supabase SQL editor.
+
+4. Configure Supabase Auth:
+
+- Enable Google provider in Supabase Auth settings.
+- Add callback URL: `http://localhost:3000/api/auth/callback` for local development.
+- Add your production callback URL on deployment.
+
+5. Configure MSG91 OTP credentials in `.env.local`.
+
+6. Run the development server:
 
 ```bash
 npm run dev
@@ -15,6 +37,13 @@ bun dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+## Auth Flow Added
+
+- Google OAuth sign-in for both `signup` and `login` pages.
+- Profile storage in Supabase table `public.user_profiles`.
+- Phone OTP send/verify with MSG91.
+- OTP verification required to complete both signup and login flow.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
