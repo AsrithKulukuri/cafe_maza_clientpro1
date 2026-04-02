@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { apiFetch } from "@/lib/api";
 
 type BookingModalProps = {
     open: boolean;
@@ -15,10 +16,12 @@ type BookingForm = {
     guests: string;
     date: string;
     time: string;
+    tableNumber: string;
     request: string;
 };
 
 const timeSlots = ["18:00", "19:00", "20:00", "21:00", "22:00", "23:00"];
+const tableOptions = Array.from({ length: 12 }).map((_, index) => index + 1);
 
 const initialForm: BookingForm = {
     name: "",
@@ -26,31 +29,92 @@ const initialForm: BookingForm = {
     guests: "2",
     date: "",
     time: "",
+    tableNumber: "",
     request: "",
 };
 
 export function BookingModal({ open, onClose, onSuccess }: BookingModalProps) {
     const [form, setForm] = useState<BookingForm>(initialForm);
     const [submitted, setSubmitted] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState("");
+    const [bookedTables, setBookedTables] = useState<number[]>([]);
+    const [loadingAvailability, setLoadingAvailability] = useState(false);
 
     const isValid = useMemo(
-        () => Boolean(form.name.trim() && form.phone.trim() && form.date && form.time),
+        () => Boolean(form.name.trim() && form.phone.trim() && form.date && form.time && form.tableNumber),
         [form]
     );
+
+    useEffect(() => {
+        async function loadAvailability() {
+            if (!form.date || !form.time) {
+                setBookedTables([]);
+                return;
+            }
+
+            try {
+                setLoadingAvailability(true);
+                const availability = await apiFetch<{ bookedTables: number[] }>(
+                    `/api/reservations/availability?date=${encodeURIComponent(form.date)}&time=${encodeURIComponent(form.time)}`
+                );
+                setBookedTables(Array.isArray(availability.bookedTables) ? availability.bookedTables : []);
+            } catch {
+                setBookedTables([]);
+            } finally {
+                setLoadingAvailability(false);
+            }
+        }
+
+        void loadAvailability();
+    }, [form.date, form.time]);
+
+    useEffect(() => {
+        if (!form.tableNumber) {
+            return;
+        }
+
+        const selectedTable = Number(form.tableNumber);
+        if (bookedTables.includes(selectedTable)) {
+            setForm((prev) => ({ ...prev, tableNumber: "" }));
+            setError(`Table T${selectedTable} is already booked for this time slot.`);
+        }
+    }, [bookedTables, form.tableNumber]);
 
     const update = (field: keyof BookingForm, value: string) => {
         setForm((prev) => ({ ...prev, [field]: value }));
     };
 
-    const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         setSubmitted(true);
+        setError("");
         if (!isValid) return;
 
-        onSuccess();
-        setForm(initialForm);
-        setSubmitted(false);
-        onClose();
+        try {
+            setSaving(true);
+            await apiFetch("/api/reservations", {
+                method: "POST",
+                body: JSON.stringify({
+                    name: form.name,
+                    phone: form.phone,
+                    guests: Number(form.guests),
+                    date: form.date,
+                    time: form.time,
+                    tableNumber: Number(form.tableNumber),
+                    specialRequest: form.request,
+                }),
+            });
+
+            onSuccess();
+            setForm(initialForm);
+            setSubmitted(false);
+            onClose();
+        } catch (requestError) {
+            setError(requestError instanceof Error ? requestError.message : "Reservation failed");
+        } finally {
+            setSaving(false);
+        }
     };
 
     return (
@@ -142,6 +206,36 @@ export function BookingModal({ open, onClose, onSuccess }: BookingModalProps) {
                             </label>
 
                             <label className="text-sm text-[#F5F5F5]/75">
+                                Table
+                                <select
+                                    value={form.tableNumber}
+                                    onChange={(event) => {
+                                        setError("");
+                                        update("tableNumber", event.target.value);
+                                    }}
+                                    className="mt-2 w-full rounded-xl border border-[#CFAF63]/25 bg-[#0E0E0E] px-4 py-3 outline-none transition focus:border-[#FF6A00]"
+                                >
+                                    <option value="">Select a table</option>
+                                    {tableOptions.map((tableId) => (
+                                        <option key={tableId} value={String(tableId)} disabled={bookedTables.includes(tableId)}>
+                                            {bookedTables.includes(tableId) ? `T${tableId} (Already booked)` : `T${tableId}`}
+                                        </option>
+                                    ))}
+                                </select>
+                                {submitted && !form.tableNumber ? <span className="mt-1 block text-xs text-[#FF6A00]">Table is required.</span> : null}
+                            </label>
+
+                            {form.date && form.time ? (
+                                <p className="text-xs text-[#F5F5F5]/70">
+                                    {loadingAvailability
+                                        ? "Checking table availability..."
+                                        : bookedTables.length > 0
+                                            ? `Booked tables for ${form.time}: ${bookedTables.map((tableId) => `T${tableId}`).join(", ")}`
+                                            : "All tables are currently available for this slot."}
+                                </p>
+                            ) : null}
+
+                            <label className="text-sm text-[#F5F5F5]/75">
                                 Special request
                                 <textarea
                                     rows={3}
@@ -156,9 +250,10 @@ export function BookingModal({ open, onClose, onSuccess }: BookingModalProps) {
                                     Cancel
                                 </button>
                                 <button type="submit" className="luxury-button px-6 py-2.5 text-sm">
-                                    Reserve Table
+                                    {saving ? "Reserving..." : "Reserve Table"}
                                 </button>
                             </div>
+                            {error ? <p className="text-xs text-rose-300">{error}</p> : null}
                         </form>
                     </motion.div>
                 </>

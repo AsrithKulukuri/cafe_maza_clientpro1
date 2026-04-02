@@ -2,20 +2,50 @@
 
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import type { Dish } from "@/data/mockData";
 
 type DishCardProps = {
     dish: Dish;
     onAdd?: (dish: Dish) => void;
+    priority?: boolean;
 };
 
-export function DishCard({ dish, onAdd }: DishCardProps) {
+function getOptimizedImageSrc(src: string) {
+    if (!src) {
+        return src;
+    }
+
+    // Supabase public storage supports width/quality transforms via query params.
+    if (src.includes(".supabase.co/storage/v1/object/public/")) {
+        const separator = src.includes("?") ? "&" : "?";
+        return `${src}${separator}width=640&quality=55`;
+    }
+
+    // Unsplash supports URL transforms to deliver lighter images.
+    if (src.includes("images.unsplash.com")) {
+        const separator = src.includes("?") ? "&" : "?";
+        return `${src}${separator}auto=format&fit=crop&w=640&q=55`;
+    }
+
+    return src;
+}
+
+export const DishCard = memo(function DishCard({ dish, onAdd, priority = false }: DishCardProps) {
     const [imageLoaded, setImageLoaded] = useState(false);
     const [addPulse, setAddPulse] = useState(false);
     const lower = dish.name.toLowerCase();
-    const isVeg = !["chicken", "mutton", "lamb", "fish", "murgh"].some((token) => lower.includes(token));
-    const popular = ["chicken tikka", "butter chicken", "biryani", "paneer butter masala"].some((token) => lower.includes(token));
+    const imageSrc = useMemo(() => getOptimizedImageSrc(dish.image), [dish.image]);
+    const [currentImageSrc, setCurrentImageSrc] = useState(imageSrc);
+    const isRemoteImage = /^https?:\/\//i.test(currentImageSrc);
+    const isVeg = dish.isVeg ?? !["chicken", "mutton", "lamb", "fish", "murgh"].some((token) => lower.includes(token));
+    const popular = dish.isBestSeller ?? ["chicken tikka", "butter chicken", "biryani", "paneer butter masala"].some((token) => lower.includes(token));
+    const isSoldOut = Boolean(dish.isSoldOut);
+
+    useEffect(() => {
+        setCurrentImageSrc(imageSrc);
+        setImageLoaded(false);
+    }, [imageSrc]);
 
     return (
         <motion.article
@@ -28,11 +58,25 @@ export function DishCard({ dish, onAdd }: DishCardProps) {
             <div className="relative h-56 overflow-hidden bg-black/40">
                 {!imageLoaded ? <div className="skeleton-shimmer absolute inset-0" /> : null}
                 <Image
-                    src={dish.image}
+                    src={currentImageSrc}
                     alt={dish.name}
                     fill
                     sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                    quality={60}
+                    priority={priority}
+                    loading={priority ? "eager" : "lazy"}
+                    fetchPriority={priority ? "high" : "low"}
+                    unoptimized={isRemoteImage}
+                    decoding="async"
                     onLoad={() => setImageLoaded(true)}
+                    onError={() => {
+                        if (currentImageSrc !== "/images/soup.jpg") {
+                            setCurrentImageSrc("/images/soup.jpg");
+                            return;
+                        }
+
+                        setImageLoaded(true);
+                    }}
                     className="object-cover transition duration-700 group-hover:scale-125"
                 />
                 <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/20 to-transparent" />
@@ -45,8 +89,14 @@ export function DishCard({ dish, onAdd }: DishCardProps) {
                     whileInView={{ opacity: 1, scale: 1 }}
                     transition={{ duration: 0.4 }}
                 >
-                    {popular ? "🔥 Popular" : "⭐ Recommended"}
+                    {popular ? "🔥 Most Selling" : "⭐ Recommended"}
                 </motion.div>
+
+                {isSoldOut ? (
+                    <div className="absolute left-4 top-4 rounded-full border border-rose-300/50 bg-rose-500/25 px-3 py-1 text-xs font-semibold uppercase tracking-[0.15em] text-rose-200">
+                        Sold Out
+                    </div>
+                ) : null}
             </div>
 
             {/* Content Section - Enhanced */}
@@ -73,20 +123,27 @@ export function DishCard({ dish, onAdd }: DishCardProps) {
                 {onAdd ? (
                     <motion.button
                         onClick={() => {
+                            if (isSoldOut) {
+                                return;
+                            }
                             onAdd(dish);
                             setAddPulse(true);
                             window.setTimeout(() => setAddPulse(false), 260);
                         }}
+                        disabled={isSoldOut}
                         whileHover={{ scale: 1.02, boxShadow: "0_0_30px_rgba(255,106,0,0.4)" }}
                         whileTap={{ scale: 0.98 }}
                         animate={addPulse ? { scale: [1, 1.08, 1] } : { scale: 1 }}
                         transition={{ duration: 0.28 }}
-                        className="w-full rounded-lg border border-[#FF6A00]/50 bg-linear-to-r from-[#FF6A00]/20 to-[#CFAF63]/20 px-4 py-3 text-sm font-semibold text-[#F5F5F5] transition md:translate-y-2 md:opacity-0 md:group-hover:translate-y-0 md:group-hover:opacity-100 hover:border-[#FF6A00] hover:from-[#FF6A00]/35 hover:to-[#CFAF63]/35"
+                        className={`w-full rounded-lg border px-4 py-3 text-sm font-semibold text-[#F5F5F5] transition md:translate-y-2 md:opacity-0 md:group-hover:translate-y-0 md:group-hover:opacity-100 ${isSoldOut
+                            ? "cursor-not-allowed border-rose-400/40 bg-rose-500/15 text-rose-200/90"
+                            : "border-[#FF6A00]/50 bg-linear-to-r from-[#FF6A00]/20 to-[#CFAF63]/20 hover:border-[#FF6A00] hover:from-[#FF6A00]/35 hover:to-[#CFAF63]/35"
+                            }`}
                     >
-                        + Add to Cart
+                        {isSoldOut ? "Currently Unavailable" : "+ Add to Cart"}
                     </motion.button>
                 ) : null}
             </div>
         </motion.article>
     );
-}
+});

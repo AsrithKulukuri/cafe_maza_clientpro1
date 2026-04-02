@@ -1,18 +1,6 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Playfair_Display } from "next/font/google";
+import { GlobalPageNav } from "@/components/layout/GlobalPageNav";
 import "./globals.css";
-
-const inter = Inter({
-  variable: "--font-body",
-  subsets: ["latin"],
-  display: "swap",
-});
-
-const playfair = Playfair_Display({
-  variable: "--font-heading",
-  subsets: ["latin"],
-  display: "swap",
-});
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://cafemaza.vercel.app";
 
@@ -73,7 +61,7 @@ export const metadata: Metadata = {
     icon: [
       { url: "/logo-mark.svg", type: "image/svg+xml" },
       { url: "/favicon.ico" },
-      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-192.svg", sizes: "192x192", type: "image/svg+xml" },
     ],
     apple: "/logo-mark.svg",
   },
@@ -87,7 +75,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${inter.variable} ${playfair.variable} antialiased bg-[#0B0B0B] text-[#F5F5F5]`}>
+      <body className="antialiased bg-[#0B0B0B] text-[#F5F5F5]">
+        <GlobalPageNav />
         {children}
       </body>
     </html>
