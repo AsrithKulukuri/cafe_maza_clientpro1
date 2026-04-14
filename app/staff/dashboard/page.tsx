@@ -10,7 +10,7 @@ import { clearAuthSession, getAuthToken, getAuthUser } from "@/lib/authToken";
 import { socket } from "@/lib/socket";
 import { QuickOrderPanel } from "@/components/staff/QuickOrderPanel";
 
-type OrderStatus = "new" | "preparing" | "ready" | "completed";
+type OrderStatus = "new" | "preparing" | "ready" | "out_for_delivery" | "completed";
 type ReservationStatus = "confirmed" | "completed" | "cancelled";
 type ScreeningStatus = "pending" | "confirmed" | "completed" | "cancelled";
 
@@ -20,7 +20,10 @@ type BackendOrder = {
     totalAmount: number;
     address: string;
     createdAt: string;
-    userId?: { name?: string; email?: string };
+    customerPhone?: string;
+    userId?: { name?: string; email?: string; phone?: string };
+    deliveryOtp?: string;
+    deliveryPartnerId?: { name?: string; phone?: string } | null;
     items: Array<{ quantity: number; menuItemId?: { name?: string; price?: number } }>;
 };
 
@@ -33,6 +36,10 @@ type StaffOrder = {
     total: number;
     createdAt: string;
     deliveryAddress: string;
+    customerPhone?: string;
+    deliveryOtp?: string;
+    deliveryPartnerName?: string;
+    deliveryPartnerPhone?: string;
 };
 
 type BackendReservation = {
@@ -62,6 +69,7 @@ function fromBackendOrderStatus(status: BackendOrder["status"]): OrderStatus {
     if (status === "placed") return "new";
     if (status === "preparing") return "preparing";
     if (status === "ready") return "ready";
+    if (status === "out_for_delivery") return "out_for_delivery";
     return "completed";
 }
 
@@ -69,6 +77,7 @@ function toBackendOrderStatus(status: OrderStatus): BackendOrder["status"] {
     if (status === "new") return "placed";
     if (status === "preparing") return "preparing";
     if (status === "ready") return "ready";
+    if (status === "out_for_delivery") return "out_for_delivery";
     return "delivered";
 }
 
@@ -102,6 +111,16 @@ export default function StaffDashboard() {
         const logged = getAuthUser();
         if (!logged || !["staff", "bearer", "kitchen", "manager", "admin"].includes(logged.role)) {
             router.push("/staff-login");
+            return;
+        }
+
+        if (logged.role === "kitchen") {
+            router.push("/kitchen/dashboard");
+            return;
+        }
+
+        if (logged.role === "bearer") {
+            router.push("/bearer/dashboard");
             return;
         }
 
@@ -146,6 +165,10 @@ export default function StaffDashboard() {
                         total: order.totalAmount,
                         createdAt: order.createdAt,
                         deliveryAddress: order.address,
+                        customerPhone: order.userId?.phone || order.customerPhone || undefined,
+                        deliveryOtp: order.deliveryOtp || undefined,
+                        deliveryPartnerName: order.deliveryPartnerId?.name || undefined,
+                        deliveryPartnerPhone: order.deliveryPartnerId?.phone || undefined,
                     }))
                 );
 
@@ -260,10 +283,11 @@ export default function StaffDashboard() {
         new: { icon: Zap, label: "New Orders", color: "text-[#FF6A00]", bg: "bg-[#FF6A00]/10" },
         preparing: { icon: Clock, label: "Preparing", color: "text-[#CFAF63]", bg: "bg-[#CFAF63]/10" },
         ready: { icon: CheckCircle, label: "Ready", color: "text-[#00D98E]", bg: "bg-[#00D98E]/10" },
+        out_for_delivery: { icon: UtensilsCrossed, label: "Out for Delivery", color: "text-[#6CA3EA]", bg: "bg-[#3B82F6]/10" },
         completed: { icon: CheckCircle, label: "Completed", color: "text-[#888]", bg: "bg-[#888]/10" },
     };
 
-    const orderTabs: OrderStatus[] = ["new", "preparing", "ready", "completed"];
+    const orderTabs: OrderStatus[] = ["new", "preparing", "ready", "out_for_delivery", "completed"];
     const visibleOperations = canSeeOperations;
     const currentOrders = useMemo(() => orders.filter((order) => order.status === activeTab), [orders, activeTab]);
     const activeReservations = useMemo(
@@ -359,6 +383,18 @@ export default function StaffDashboard() {
                                 </div>
 
                                 <p className="mb-2 text-xs text-[#8D8D8D]">Deliver to: {order.deliveryAddress}</p>
+                                {order.customerPhone ? (
+                                    <p className="mb-1 text-xs text-[#8D8D8D]">Customer Phone: {order.customerPhone}</p>
+                                ) : null}
+                                {order.deliveryPartnerName ? (
+                                    <p className="mb-1 text-xs text-[#6CA3EA]">Delivery Partner: {order.deliveryPartnerName}</p>
+                                ) : null}
+                                {order.deliveryPartnerPhone ? (
+                                    <p className="mb-1 text-xs text-[#8D8D8D]">Partner Phone: {order.deliveryPartnerPhone}</p>
+                                ) : null}
+                                {order.deliveryOtp ? (
+                                    <p className="mb-2 text-xs font-semibold text-[#CFAF63]">Delivery OTP: {order.deliveryOtp}</p>
+                                ) : null}
                                 <div className="mb-4 flex items-center justify-between border-b border-[#333] pb-4">
                                     <p className="text-sm text-[#999]">
                                         {new Date(order.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
@@ -385,6 +421,15 @@ export default function StaffDashboard() {
                                     </button>
                                 )}
                                 {activeTab === "ready" && (
+                                    <button
+                                        onClick={() => updateOrderStatus(order.id, "out_for_delivery")}
+                                        disabled={actionKey === `order:${order.id}:out_for_delivery`}
+                                        className="w-full rounded-lg bg-[#3B82F6]/20 py-2 text-sm font-semibold text-[#6CA3EA] transition hover:bg-[#3B82F6]/30 disabled:opacity-60"
+                                    >
+                                        {actionKey === `order:${order.id}:out_for_delivery` ? "Updating..." : "Hand Over to Delivery"}
+                                    </button>
+                                )}
+                                {activeTab === "out_for_delivery" && (
                                     <button
                                         onClick={() => updateOrderStatus(order.id, "completed")}
                                         disabled={actionKey === `order:${order.id}:completed`}

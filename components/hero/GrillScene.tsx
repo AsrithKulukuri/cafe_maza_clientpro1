@@ -218,19 +218,25 @@ function GrillRig() {
 }
 
 export function GrillScene() {
+    const isSmallViewport = typeof window !== "undefined" ? window.innerWidth < 768 : false;
+
     return (
         <div className="h-full w-full">
-            <Canvas camera={{ position: [0, 1.8, 6.7], fov: 46 }} shadows dpr={[1, 1.5]} gl={{ antialias: true }}>
+            <Canvas
+                camera={{ position: [0, 1.8, 6.7], fov: 46 }}
+                dpr={isSmallViewport ? [1, 1.1] : [1, 1.25]}
+                gl={{ antialias: false, powerPreference: "high-performance" }}
+            >
                 <color attach="background" args={["#0B0B0B"]} />
                 <fog attach="fog" args={["#0B0B0B", 6, 15]} />
-                <ambientLight intensity={0.3} />
-                <pointLight color="#FF6A00" position={[0, 2.2, 1.5]} intensity={2.9} distance={14} />
-                <pointLight color="#CFAF63" position={[0, 3.3, -2.6]} intensity={0.8} />
-                <spotLight color="#FF8F2A" position={[2.2, 4.2, 2.8]} angle={0.44} intensity={2.35} penumbra={0.55} castShadow />
+                <ambientLight intensity={0.35} />
+                <pointLight color="#FF6A00" position={[0, 2.2, 1.5]} intensity={2.25} distance={12} />
+                <pointLight color="#CFAF63" position={[0, 3.3, -2.6]} intensity={0.7} />
+                <spotLight color="#FF8F2A" position={[2.2, 4.2, 2.8]} angle={0.44} intensity={1.8} penumbra={0.55} />
 
                 <GrillRig />
 
-                <OrbitControls enablePan={false} enableZoom={false} autoRotate autoRotateSpeed={0.28} maxPolarAngle={1.74} minPolarAngle={1.14} />
+                <OrbitControls enablePan={false} enableZoom={false} autoRotate={!isSmallViewport} autoRotateSpeed={0.24} maxPolarAngle={1.74} minPolarAngle={1.14} />
             </Canvas>
         </div>
     );

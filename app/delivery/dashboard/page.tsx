@@ -20,6 +20,28 @@ type DeliveryOrder = {
 
 type Tab = "available" | "assigned" | "delivered";
 
+function extractCoordsFromAddress(rawAddress: string): { latitude: number; longitude: number } | null {
+    const match = rawAddress.match(/coords:([+-]?\d+(?:\.\d+)?),([+-]?\d+(?:\.\d+)?)/i);
+    if (!match) {
+        return null;
+    }
+
+    const latitude = Number(match[1]);
+    const longitude = Number(match[2]);
+
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+        return null;
+    }
+
+    return { latitude, longitude };
+}
+
+function getDisplayAddress(rawAddress: string): string {
+    return rawAddress
+        .replace(/\s*\|\s*coords:[+-]?\d+(?:\.\d+)?,[+-]?\d+(?:\.\d+)?/i, "")
+        .trim();
+}
+
 export default function DeliveryDashboard() {
     const router = useRouter();
     const [tab, setTab] = useState<Tab>("available");
@@ -31,6 +53,7 @@ export default function DeliveryDashboard() {
     const [pendingDeliveryOrder, setPendingDeliveryOrder] = useState<DeliveryOrder | null>(null);
     const [deliveryOtp, setDeliveryOtp] = useState("");
     const [searchQuery, setSearchQuery] = useState("");
+    const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
 
     const PAGE_SIZE = 6;
@@ -83,13 +106,16 @@ export default function DeliveryDashboard() {
         }
 
         const refreshOrders = () => {
+            if (typeof document !== "undefined" && document.visibilityState !== "visible") {
+                return;
+            }
             void loadOrders();
         };
 
         socket.on("order_created", refreshOrders);
         socket.on("order_status_updated", refreshOrders);
 
-        const timer = window.setInterval(refreshOrders, 10000);
+        const timer = window.setInterval(refreshOrders, 20000);
 
         return () => {
             socket.off("order_created", refreshOrders);
@@ -177,8 +203,18 @@ export default function DeliveryDashboard() {
 
     const list = tab === "available" ? availableOrders : tab === "assigned" ? assignedOrders : deliveredOrders;
 
+    useEffect(() => {
+        const timer = window.setTimeout(() => {
+            setDebouncedSearchQuery(searchQuery);
+        }, 220);
+
+        return () => {
+            window.clearTimeout(timer);
+        };
+    }, [searchQuery]);
+
     const filteredList = useMemo(() => {
-        const query = searchQuery.trim().toLowerCase();
+        const query = debouncedSearchQuery.trim().toLowerCase();
         if (!query) {
             return list;
         }
@@ -196,7 +232,7 @@ export default function DeliveryDashboard() {
                 address.includes(query)
             );
         });
-    }, [list, searchQuery]);
+    }, [list, debouncedSearchQuery]);
 
     const totalPages = Math.max(1, Math.ceil(filteredList.length / PAGE_SIZE));
     const paginatedList = useMemo(() => {
@@ -206,7 +242,7 @@ export default function DeliveryDashboard() {
 
     useEffect(() => {
         setCurrentPage(1);
-    }, [tab, searchQuery]);
+    }, [tab, debouncedSearchQuery]);
 
     useEffect(() => {
         if (currentPage > totalPages) {
@@ -272,67 +308,82 @@ export default function DeliveryDashboard() {
 
             <div className="space-y-4">
                 {!loading &&
-                    paginatedList.map((order) => (
-                        <div key={order._id} className="glass-card rounded-2xl border border-[#CFAF63]/25 p-5">
-                            <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-                                <div>
-                                    <p className="text-xs uppercase tracking-[0.1em] text-[#999]">Customer</p>
-                                    <p className="text-[#F5F5F5]">{order.userId?.name || order.userId?.email || "Customer"}</p>
+                    paginatedList.map((order) => {
+                        const coords = extractCoordsFromAddress(order.address);
+                        const displayAddress = getDisplayAddress(order.address);
+
+                        return (
+                            <div key={order._id} className="glass-card rounded-2xl border border-[#CFAF63]/25 p-5">
+                                <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+                                    <div>
+                                        <p className="text-xs uppercase tracking-[0.1em] text-[#999]">Customer</p>
+                                        <p className="text-[#F5F5F5]">{order.userId?.name || order.userId?.email || "Customer"}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs uppercase tracking-[0.1em] text-[#999]">Order</p>
+                                        <p className="text-[#CFAF63]">#{order._id.slice(-6).toUpperCase()}</p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <p className="text-xs uppercase tracking-[0.1em] text-[#999]">Order</p>
-                                    <p className="text-[#CFAF63]">#{order._id.slice(-6).toUpperCase()}</p>
+
+                                <div className="mb-4">
+                                    <p className="text-xs uppercase tracking-[0.1em] text-[#999]">Items</p>
+                                    <p className="text-sm text-[#CCC]">
+                                        {order.items.map((item) => `${item.menuItemId?.name || "Item"} x${item.quantity}`).join(", ")}
+                                    </p>
                                 </div>
-                            </div>
 
-                            <div className="mb-4">
-                                <p className="text-xs uppercase tracking-[0.1em] text-[#999]">Items</p>
-                                <p className="text-sm text-[#CCC]">
-                                    {order.items.map((item) => `${item.menuItemId?.name || "Item"} x${item.quantity}`).join(", ")}
-                                </p>
-                            </div>
-
-                            <div className="mb-5">
-                                <p className="text-xs uppercase tracking-[0.1em] text-[#999]">Delivery Address</p>
-                                <p className="text-sm text-[#F5F5F5]">{order.address}</p>
-                            </div>
-
-                            {tab === "available" ? (
-                                <button
-                                    onClick={() => takeOrder(order._id)}
-                                    className="w-full rounded-lg bg-gradient-to-r from-[#CFAF63] to-[#FF6A00] px-4 py-2 font-semibold text-[#111] hover:shadow-lg"
-                                >
-                                    <PackageCheck size={16} className="mr-2 inline" />
-                                    Take This Order
-                                </button>
-                            ) : null}
-
-                            {tab === "assigned" ? (
-                                <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
-                                    <button
-                                        onClick={() => updateStatus(order._id, "out_for_delivery")}
-                                        className="rounded-lg bg-[#3B82F6]/20 px-4 py-2 font-semibold text-[#6CA3EA] hover:bg-[#3B82F6]/30"
-                                    >
-                                        <Truck size={16} className="mr-1 inline" />
-                                        Out for Delivery
-                                    </button>
-                                    <button
-                                        onClick={() => router.push(`/delivery/tracking/${order._id}`)}
-                                        className="rounded-lg border border-[#CFAF63]/40 px-4 py-2 font-semibold text-[#CFAF63] hover:bg-[#CFAF63]/10"
-                                    >
-                                        <Navigation size={16} className="mr-1 inline" />
-                                        Live Tracking
-                                    </button>
-                                    <button
-                                        onClick={() => openDeliveredDialog(order)}
-                                        className="rounded-lg bg-[#00D98E]/20 px-4 py-2 font-semibold text-[#00D98E] hover:bg-[#00D98E]/30"
-                                    >
-                                        Mark Delivered
-                                    </button>
+                                <div className="mb-5">
+                                    <p className="text-xs uppercase tracking-[0.1em] text-[#999]">Delivery Address</p>
+                                    <p className="text-sm text-[#F5F5F5]">{displayAddress || order.address}</p>
+                                    {coords ? (
+                                        <a
+                                            href={`https://www.google.com/maps?q=${coords.latitude},${coords.longitude}`}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="mt-2 inline-block text-xs text-[#CFAF63] hover:text-[#FF6A00]"
+                                        >
+                                            Open in Maps ({coords.latitude.toFixed(5)}, {coords.longitude.toFixed(5)})
+                                        </a>
+                                    ) : null}
                                 </div>
-                            ) : null}
-                        </div>
-                    ))}
+
+                                {tab === "available" ? (
+                                    <button
+                                        onClick={() => takeOrder(order._id)}
+                                        className="w-full rounded-lg bg-gradient-to-r from-[#CFAF63] to-[#FF6A00] px-4 py-2 font-semibold text-[#111] hover:shadow-lg"
+                                    >
+                                        <PackageCheck size={16} className="mr-2 inline" />
+                                        Take This Order
+                                    </button>
+                                ) : null}
+
+                                {tab === "assigned" ? (
+                                    <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+                                        <button
+                                            onClick={() => updateStatus(order._id, "out_for_delivery")}
+                                            className="rounded-lg bg-[#3B82F6]/20 px-4 py-2 font-semibold text-[#6CA3EA] hover:bg-[#3B82F6]/30"
+                                        >
+                                            <Truck size={16} className="mr-1 inline" />
+                                            Out for Delivery
+                                        </button>
+                                        <button
+                                            onClick={() => router.push(`/delivery/tracking/${order._id}`)}
+                                            className="rounded-lg border border-[#CFAF63]/40 px-4 py-2 font-semibold text-[#CFAF63] hover:bg-[#CFAF63]/10"
+                                        >
+                                            <Navigation size={16} className="mr-1 inline" />
+                                            Live Tracking
+                                        </button>
+                                        <button
+                                            onClick={() => openDeliveredDialog(order)}
+                                            className="rounded-lg bg-[#00D98E]/20 px-4 py-2 font-semibold text-[#00D98E] hover:bg-[#00D98E]/30"
+                                        >
+                                            Mark Delivered
+                                        </button>
+                                    </div>
+                                ) : null}
+                            </div>
+                        );
+                    })}
             </div>
 
             {!loading && filteredList.length > PAGE_SIZE ? (

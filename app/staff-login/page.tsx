@@ -38,7 +38,13 @@ export default function StaffLoginPage() {
                 role: response.user.role as AppUser["role"],
             });
 
-            router.push("/staff/dashboard");
+            if (response.user.role === "kitchen") {
+                router.push("/kitchen/dashboard");
+            } else if (response.user.role === "bearer") {
+                router.push("/bearer/dashboard");
+            } else {
+                router.push("/staff/dashboard");
+            }
         } catch (requestError) {
             setError(requestError instanceof Error ? requestError.message : "Login failed");
         }

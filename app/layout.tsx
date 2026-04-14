@@ -5,7 +5,7 @@ import "./globals.css";
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://cafemaza.vercel.app";
 
 export const viewport: Viewport = {
-  themeColor: "#0B0B0B",
+  themeColor: "#E0781E",
   colorScheme: "dark",
   width: "device-width",
   initialScale: 1,
@@ -59,11 +59,11 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: "/logo-mark.svg", type: "image/svg+xml" },
+      { url: "/logoo.jpeg", type: "image/jpeg" },
       { url: "/favicon.ico" },
-      { url: "/icons/icon-192.svg", sizes: "192x192", type: "image/svg+xml" },
+      { url: "/logoo.jpeg", sizes: "192x192", type: "image/jpeg" },
     ],
-    apple: "/logo-mark.svg",
+    apple: "/logoo.jpeg",
   },
   manifest: "/manifest.json",
 };
@@ -75,7 +75,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="antialiased bg-[#0B0B0B] text-[#F5F5F5]">
+      <body suppressHydrationWarning className="antialiased bg-[#0B0B0B] text-[#F5F5F5]">
         <GlobalPageNav />
         {children}
       </body>

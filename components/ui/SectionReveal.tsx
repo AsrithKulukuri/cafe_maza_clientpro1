@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { ReactNode } from "react";
 import { revealLeft, revealRight, revealUp } from "@/lib/motionPresets";
 
@@ -11,7 +11,12 @@ type SectionRevealProps = {
 };
 
 export function SectionReveal({ children, className, direction = "up" }: SectionRevealProps) {
+    const reduceMotion = useReducedMotion();
     const variants = direction === "left" ? revealLeft : direction === "right" ? revealRight : revealUp;
+
+    if (reduceMotion) {
+        return <section className={className}>{children}</section>;
+    }
 
     return (
         <motion.section

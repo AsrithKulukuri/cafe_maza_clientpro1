@@ -1,73 +1,39 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import type { User } from "@supabase/supabase-js";
 
-import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { API_BASE_URL } from "@/lib/api";
+import { setAuthSession } from "@/lib/authToken";
 
-type ProfileApiResponse = {
-    profile: {
-        full_name: string | null;
-        phone_e164: string | null;
-        pending_phone_e164: string | null;
-        phone_verified: boolean;
-    } | null;
+type OtpVerifyResponse = {
+    token: string;
     user: {
-        email: string | null;
-        fullName: string | null;
+        id: string;
+        name: string;
+        email: string;
+        phone: string;
+        role: "customer" | "staff" | "bearer" | "kitchen" | "manager" | "delivery" | "admin";
     };
 };
 
 export default function LoginPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const supabase = useMemo(() => createSupabaseBrowserClient(), []);
 
-    const [user, setUser] = useState<User | null>(null);
-    const [loadingSession, setLoadingSession] = useState(true);
-    const [busy, setBusy] = useState(false);
-    const [fullName, setFullName] = useState("");
+    const nextPath = (() => {
+        const rawNext = searchParams.get("next") || "/portals";
+        return rawNext.startsWith("/") ? rawNext : "/portals";
+    })();
+
     const [phone, setPhone] = useState("");
     const [otpCode, setOtpCode] = useState("");
     const [otpSent, setOtpSent] = useState(false);
-    const [verified, setVerified] = useState(false);
+    const [busy, setBusy] = useState(false);
     const [resendIn, setResendIn] = useState(0);
     const [info, setInfo] = useState("");
     const [error, setError] = useState("");
-
-    useEffect(() => {
-        const oauthStatus = searchParams.get("oauth");
-
-        if (oauthStatus === "success") {
-            setInfo("Google sign-in successful. Verify your mobile number with OTP to continue.");
-        }
-
-        if (oauthStatus === "error") {
-            setError("Google sign-in failed. Please try again.");
-        }
-    }, [searchParams]);
-
-    useEffect(() => {
-        async function bootstrap() {
-            const {
-                data: { user: currentUser },
-            } = await supabase.auth.getUser();
-
-            setUser(currentUser ?? null);
-
-            if (!currentUser) {
-                setLoadingSession(false);
-                return;
-            }
-
-            await loadProfile();
-            setLoadingSession(false);
-        }
-
-        bootstrap();
-    }, [supabase]);
 
     useEffect(() => {
         if (resendIn <= 0) {
@@ -80,45 +46,6 @@ export default function LoginPage() {
 
         return () => clearInterval(timer);
     }, [resendIn]);
-
-    useEffect(() => {
-        if (!verified) {
-            return;
-        }
-
-        const timer = setTimeout(() => {
-            router.replace("/portals");
-        }, 1200);
-
-        return () => clearTimeout(timer);
-    }, [verified, router]);
-
-    async function loadProfile() {
-        setError("");
-
-        const response = await fetch("/api/auth/profile", { method: "GET" });
-
-        if (!response.ok) {
-            return;
-        }
-
-        const data = (await response.json()) as ProfileApiResponse;
-        const resolvedName = data.profile?.full_name ?? data.user.fullName ?? "";
-        const resolvedPhone = data.profile?.pending_phone_e164 ?? data.profile?.phone_e164 ?? "";
-
-        setFullName(resolvedName);
-        setPhone(resolvedPhone);
-        const isVerified = Boolean(data.profile?.phone_verified);
-        setVerified(isVerified);
-
-        if (isVerified) {
-            setInfo("Mobile already verified. Redirecting to your dashboard...");
-        }
-    }
-
-    function continueWithGoogle() {
-        window.location.href = "/api/auth/google?next=/login";
-    }
 
     async function handleSendOtp(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -133,38 +60,33 @@ export default function LoginPage() {
         setError("");
 
         try {
-            const upsertResponse = await fetch("/api/auth/profile", {
+            const response = await fetch(`${API_BASE_URL}/api/auth/otp/send`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     intent: "login",
-                    fullName,
                     phone,
                 }),
             });
 
-            const upsertResult = await upsertResponse.json();
+            const result = await response.json();
 
-            if (!upsertResponse.ok) {
-                throw new Error(upsertResult.error ?? "Failed to update profile");
+            if (!response.ok) {
+                throw new Error(result.message ?? "Failed to send OTP");
             }
 
-            const sendOtpResponse = await fetch("/api/auth/otp/send", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ phone }),
-            });
-
-            const sendOtpResult = await sendOtpResponse.json();
-
-            if (!sendOtpResponse.ok) {
-                throw new Error(sendOtpResult.error ?? "Failed to send OTP");
-            }
+            const requestRef =
+                typeof result.providerRequestId === "string" && result.providerRequestId.trim()
+                    ? ` Ref: ${result.providerRequestId}`
+                    : "";
+            const destinationInfo =
+                typeof result.sentTo === "string" && result.sentTo.trim()
+                    ? ` SentTo: ${result.sentTo}`
+                    : "";
 
             setOtpSent(true);
-            setVerified(false);
-            setResendIn(30);
-            setInfo("OTP sent successfully. Enter the code to complete login.");
+            setResendIn(typeof result.resendInSeconds === "number" ? result.resendInSeconds : 30);
+            setInfo(`OTP sent. Enter the code to login.${requestRef}${destinationInfo ? ` ${destinationInfo}` : ""}`);
         } catch (requestError) {
             setError(requestError instanceof Error ? requestError.message : "Failed to send OTP");
         } finally {
@@ -182,20 +104,32 @@ export default function LoginPage() {
         setError("");
 
         try {
-            const sendOtpResponse = await fetch("/api/auth/otp/send", {
+            const response = await fetch(`${API_BASE_URL}/api/auth/otp/send`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ phone }),
+                body: JSON.stringify({
+                    intent: "login",
+                    phone,
+                }),
             });
 
-            const sendOtpResult = await sendOtpResponse.json();
+            const result = await response.json();
 
-            if (!sendOtpResponse.ok) {
-                throw new Error(sendOtpResult.error ?? "Failed to resend OTP");
+            if (!response.ok) {
+                throw new Error(result.message ?? "Failed to resend OTP");
             }
 
-            setResendIn(30);
-            setInfo("A new OTP has been sent.");
+            const requestRef =
+                typeof result.providerRequestId === "string" && result.providerRequestId.trim()
+                    ? ` Ref: ${result.providerRequestId}`
+                    : "";
+            const destinationInfo =
+                typeof result.sentTo === "string" && result.sentTo.trim()
+                    ? ` SentTo: ${result.sentTo}`
+                    : "";
+
+            setResendIn(typeof result.resendInSeconds === "number" ? result.resendInSeconds : 30);
+            setInfo(`A new OTP has been sent.${requestRef}${destinationInfo ? ` ${destinationInfo}` : ""}`);
         } catch (requestError) {
             setError(requestError instanceof Error ? requestError.message : "Failed to resend OTP");
         } finally {
@@ -207,7 +141,7 @@ export default function LoginPage() {
         event.preventDefault();
 
         if (!otpCode.trim()) {
-            setError("Enter the OTP code.");
+            setError("Enter OTP code.");
             return;
         }
 
@@ -216,20 +150,29 @@ export default function LoginPage() {
         setError("");
 
         try {
-            const verifyResponse = await fetch("/api/auth/otp/verify", {
+            const response = await fetch(`${API_BASE_URL}/api/auth/otp/verify`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ code: otpCode.trim() }),
+                body: JSON.stringify({
+                    intent: "login",
+                    phone,
+                    code: otpCode.trim(),
+                }),
             });
 
-            const verifyResult = await verifyResponse.json();
+            const result = (await response.json()) as Partial<OtpVerifyResponse> & { message?: string };
 
-            if (!verifyResponse.ok) {
-                throw new Error(verifyResult.error ?? "OTP verification failed");
+            if (!response.ok) {
+                throw new Error(result.message ?? "OTP verification failed");
             }
 
-            setVerified(true);
-            setInfo("Login completed. Mobile number verified.");
+            if (!result.token || !result.user) {
+                throw new Error("Invalid login response from server");
+            }
+
+            setAuthSession(result.token, result.user);
+            setInfo("Login successful. Redirecting...");
+            router.replace(nextPath);
         } catch (requestError) {
             setError(requestError instanceof Error ? requestError.message : "OTP verification failed");
         } finally {
@@ -245,85 +188,61 @@ export default function LoginPage() {
             <div className="flex items-center justify-center bg-[#0B0B0B] p-6">
                 <div className="glass-card w-full max-w-md rounded-3xl border border-[#CFAF63]/25 p-7">
                     <p className="text-sm uppercase tracking-[0.2em] text-[#CFAF63]">Login</p>
-                    <h1 className="mt-2 font-(--font-heading) text-4xl text-[#F5F5F5]">Welcome Back</h1>
+                    <h1 className="mt-2 font-(--font-heading) text-4xl text-[#F5F5F5]">Phone OTP Login</h1>
 
-                    {loadingSession ? (
-                        <p className="mt-6 text-[#F5F5F5]/80">Checking session...</p>
-                    ) : !user ? (
-                        <div className="mt-6 space-y-4">
+                    <form onSubmit={handleSendOtp} className="mt-6 space-y-4">
+                        <input
+                            type="tel"
+                            placeholder="Phone (+919876543210)"
+                            value={phone}
+                            onChange={(event) => setPhone(event.target.value)}
+                            className="w-full rounded-xl border border-[#CFAF63]/25 bg-[#121212] px-4 py-3"
+                        />
+                        <button
+                            type="submit"
+                            disabled={busy}
+                            className="w-full rounded-full bg-linear-to-r from-[#CFAF63] to-[#FF6A00] px-4 py-3 font-semibold text-[#111] disabled:opacity-70"
+                        >
+                            {busy ? "Please wait..." : otpSent ? "Send OTP Again" : "Send OTP"}
+                        </button>
+                    </form>
+
+                    {otpSent && (
+                        <form onSubmit={handleVerifyOtp} className="mt-4 space-y-4">
+                            <input
+                                type="text"
+                                placeholder="Enter OTP"
+                                value={otpCode}
+                                onChange={(event) => setOtpCode(event.target.value)}
+                                className="w-full rounded-xl border border-[#CFAF63]/25 bg-[#121212] px-4 py-3"
+                            />
                             <button
-                                onClick={continueWithGoogle}
-                                className="w-full rounded-full border border-[#CFAF63]/30 bg-[#121212] px-4 py-3 font-semibold text-[#F5F5F5] transition hover:border-[#FF6A00]"
+                                type="submit"
+                                disabled={busy}
+                                className="w-full rounded-full border border-[#CFAF63]/40 px-4 py-3 font-semibold text-[#F5F5F5] disabled:opacity-70"
                             >
-                                Continue with Google
+                                {busy ? "Verifying..." : "Verify OTP & Login"}
                             </button>
-                            <p className="text-sm text-[#F5F5F5]/70">
-                                New here?{" "}
-                                <Link href="/signup" className="text-[#CFAF63] hover:text-[#FF6A00]">
-                                    Create account
-                                </Link>
-                            </p>
-                        </div>
-                    ) : (
-                        <>
-                            <form onSubmit={handleSendOtp} className="mt-6 space-y-4">
-                                <input
-                                    type="text"
-                                    placeholder="Full Name"
-                                    value={fullName}
-                                    onChange={(event) => setFullName(event.target.value)}
-                                    className="w-full rounded-xl border border-[#CFAF63]/25 bg-[#121212] px-4 py-3"
-                                />
-                                <input
-                                    type="tel"
-                                    placeholder="Phone (+919876543210)"
-                                    value={phone}
-                                    onChange={(event) => setPhone(event.target.value)}
-                                    className="w-full rounded-xl border border-[#CFAF63]/25 bg-[#121212] px-4 py-3"
-                                />
-                                <button
-                                    type="submit"
-                                    disabled={busy}
-                                    className="w-full rounded-full bg-linear-to-r from-[#CFAF63] to-[#FF6A00] px-4 py-3 font-semibold text-[#111] disabled:opacity-70"
-                                >
-                                    {busy ? "Please wait..." : "Send OTP"}
-                                </button>
-                            </form>
-
-                            {otpSent && (
-                                <form onSubmit={handleVerifyOtp} className="mt-4 space-y-4">
-                                    <input
-                                        type="text"
-                                        placeholder="Enter OTP"
-                                        value={otpCode}
-                                        onChange={(event) => setOtpCode(event.target.value)}
-                                        className="w-full rounded-xl border border-[#CFAF63]/25 bg-[#121212] px-4 py-3"
-                                    />
-                                    <button
-                                        type="submit"
-                                        disabled={busy}
-                                        className="w-full rounded-full border border-[#CFAF63]/40 px-4 py-3 font-semibold text-[#F5F5F5] disabled:opacity-70"
-                                    >
-                                        {busy ? "Verifying..." : "Verify OTP"}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={handleResendOtp}
-                                        disabled={busy || resendIn > 0}
-                                        className="w-full rounded-full border border-[#CFAF63]/20 px-4 py-3 text-sm font-semibold text-[#F5F5F5]/90 disabled:opacity-60"
-                                    >
-                                        {resendIn > 0 ? `Resend OTP in ${resendIn}s` : "Resend OTP"}
-                                    </button>
-                                </form>
-                            )}
-                        </>
+                            <button
+                                type="button"
+                                onClick={handleResendOtp}
+                                disabled={busy || resendIn > 0}
+                                className="w-full rounded-full border border-[#CFAF63]/20 px-4 py-3 text-sm font-semibold text-[#F5F5F5]/90 disabled:opacity-60"
+                            >
+                                {resendIn > 0 ? `Resend OTP in ${resendIn}s` : "Resend OTP"}
+                            </button>
+                        </form>
                     )}
+
+                    <p className="mt-4 text-sm text-[#F5F5F5]/70">
+                        New user?{" "}
+                        <Link href={`/signup?next=${encodeURIComponent(nextPath)}`} className="text-[#CFAF63] hover:text-[#FF6A00]">
+                            Create account
+                        </Link>
+                    </p>
 
                     {info && <p className="mt-4 text-sm text-emerald-300">{info}</p>}
                     {error && <p className="mt-3 text-sm text-rose-300">{error}</p>}
-                    {verified && (
-                        <p className="mt-3 text-sm text-[#CFAF63]">Verification complete. You are logged in. Redirecting...</p>
-                    )}
                 </div>
             </div>
         </div>

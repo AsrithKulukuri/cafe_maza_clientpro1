@@ -7,6 +7,8 @@ type ApiOptions = RequestInit & {
 
 export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promise<T> {
     const token = options.token ?? (typeof window !== "undefined" ? window.localStorage.getItem("cm_token") : null);
+    const method = String(options.method || "GET").toUpperCase();
+    const cacheMode = options.cache ?? (method === "GET" && !token ? "force-cache" : "no-store");
 
     const response = await fetch(`${API_BASE_URL}${path}`, {
         ...options,
@@ -15,7 +17,7 @@ export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promi
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
             ...(options.headers || {}),
         },
-        cache: "no-store",
+        cache: cacheMode,
     });
 
     let body: unknown = null;

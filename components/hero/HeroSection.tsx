@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useRef } from "react";
-import { motion, useScroll, useTransform } from "framer-motion";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
 import { ChevronDown } from "lucide-react";
 import { GrillScene } from "@/components/hero/GrillScene";
 import { LuxuryButton } from "@/components/ui/LuxuryButton";
@@ -22,22 +22,37 @@ function formatPixels(value: number) {
 
 export function HeroSection() {
     const sectionRef = useRef<HTMLElement>(null);
+    const reduceMotion = useReducedMotion();
+    const [isMobileViewport, setIsMobileViewport] = useState(false);
     const { scrollYProgress } = useScroll({ target: sectionRef, offset: ["start start", "end start"] });
+
+    useEffect(() => {
+        const updateViewport = () => {
+            setIsMobileViewport(window.innerWidth < 768);
+        };
+
+        updateViewport();
+        window.addEventListener("resize", updateViewport);
+        return () => {
+            window.removeEventListener("resize", updateViewport);
+        };
+    }, []);
 
     const grillY = useTransform(scrollYProgress, [0, 1], [0, 120]);
     const contentY = useTransform(scrollYProgress, [0, 1], [0, -50]);
     const contentOpacity = useTransform(scrollYProgress, [0, 0.9], [1, 0.78]);
+    const shouldRenderScene = !reduceMotion && !isMobileViewport;
 
     const emberParticles = useMemo(
         () =>
-            Array.from({ length: 12 }).map((_, idx) => ({
+            Array.from({ length: shouldRenderScene ? 12 : 6 }).map((_, idx) => ({
                 left: formatPercent(10 + stableValue(idx, 12.9898) * 80),
                 delay: stableValue(idx, 78.233) * 4,
                 duration: 4 + stableValue(idx, 39.425, 1.3) * 4,
                 size: formatPixels(2 + stableValue(idx, 17.719, 2.1) * 3),
                 blur: stableValue(idx, 91.113, 0.7) > 0.5,
             })),
-        []
+        [shouldRenderScene]
     );
     const hour = new Date().getHours();
     const greeting = hour < 12 ? "Good Morning" : hour < 18 ? "Good Afternoon" : "Good Evening";
@@ -56,7 +71,7 @@ export function HeroSection() {
             />
 
             <motion.div style={{ y: grillY, willChange: "transform" }} className="absolute inset-x-0 bottom-[-6%] top-[18%] md:top-[14%]">
-                <GrillScene />
+                {shouldRenderScene ? <GrillScene /> : <div className="h-full w-full bg-[radial-gradient(circle_at_50%_40%,rgba(255,106,0,0.16),transparent_44%),linear-gradient(140deg,#0B0B0B_0%,#141414_60%,#0B0B0B_100%)]" />}
             </motion.div>
 
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_22%,rgba(0,0,0,0.74)_78%)]" />
@@ -74,7 +89,7 @@ export function HeroSection() {
                             height: particle.size,
                         }}
                         animate={{ y: [-10, -260], opacity: [0, 0.95, 0], scale: [0.6, 1, 0.7] }}
-                        transition={{ duration: particle.duration, delay: particle.delay, repeat: Infinity, ease: "easeOut", type: "tween" }}
+                        transition={reduceMotion ? undefined : { duration: particle.duration, delay: particle.delay, repeat: Infinity, ease: "easeOut", type: "tween" }}
                     />
                 ))}
             </div>
