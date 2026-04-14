@@ -1,18 +1,36 @@
 "use client";
 
-import Image from "next/image";
-import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
+import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { HeroSection } from "@/components/hero/HeroSection";
 import { DishCard } from "@/components/ui/DishCard";
 import { SectionReveal } from "@/components/ui/SectionReveal";
 import { LuxuryButton } from "@/components/ui/LuxuryButton";
 import { GoldDivider } from "@/components/ui/GoldDivider";
-import { ScreeningBookingModal } from "@/components/ui/ScreeningBookingModal";
-import { TestimonialsCarousel } from "@/components/ui/TestimonialsCarousel";
-import { ChefStorySection } from "@/components/ui/ChefStorySection";
-import { featuredDishes, grillFeatures, menuCategories, premiumPhotos, type Dish } from "@/data/mockData";
+import { featuredDishes, grillFeatures, menuCategories, type Dish } from "@/data/mockData";
 import { apiFetch } from "@/lib/api";
+
+const HeroSection = dynamic(() => import("@/components/hero/HeroSection").then((module) => module.HeroSection), {
+    ssr: false,
+    loading: () => <div className="h-[70vh] min-h-[560px] w-full animate-pulse bg-[#111111]" />,
+});
+
+const ScreeningBookingModal = dynamic(() => import("@/components/ui/ScreeningBookingModal").then((module) => module.ScreeningBookingModal), {
+    ssr: false,
+});
+
+const TestimonialsCarousel = dynamic(() => import("@/components/ui/TestimonialsCarousel").then((module) => module.TestimonialsCarousel), {
+    ssr: false,
+    loading: () => <div className="h-44 w-full animate-pulse rounded-2xl bg-[#151515]" />,
+});
+
+const CTA_ACTIONS = [
+    { title: "Reserve a Table", subtitle: "Book your premium dining experience", href: "/reserve-table", icon: "🍽️" },
+    { title: "Dine In Now", subtitle: "Walk-in or call for instant seating", href: "/contact", icon: "👥" },
+    { title: "Takeaway", subtitle: "Order ahead for quick pickup", href: "/takeaway", icon: "🛍️" },
+    { title: "Order Online", subtitle: "Home delivery with premium packaging", href: "/order-online", icon: "📦" },
+];
 
 type BackendMenuItem = {
     _id: string;
@@ -27,16 +45,32 @@ type BackendMenuItem = {
     tags?: string[];
 };
 
+type PromoBanner = {
+    _id: string;
+    title: string;
+    subtitle?: string;
+    couponCode?: string;
+    image?: string;
+    ctaText?: string;
+    ctaLink?: string;
+};
+
 export default function HomePage() {
     const [showScreeningModal, setShowScreeningModal] = useState(false);
     const [signatureDishes, setSignatureDishes] = useState<Dish[]>(featuredDishes);
+    const [isDishesLoading, setIsDishesLoading] = useState(true);
+    const [promoBanners, setPromoBanners] = useState<PromoBanner[]>([]);
+    const [activePromoIndex, setActivePromoIndex] = useState(0);
+
+    const openScreeningModal = useCallback(() => setShowScreeningModal(true), []);
+    const closeScreeningModal = useCallback(() => setShowScreeningModal(false), []);
 
     useEffect(() => {
         let mounted = true;
 
         async function loadSignatureDishes() {
             try {
-                const items = await apiFetch<BackendMenuItem[]>("/api/menu");
+                const items = await apiFetch<BackendMenuItem[]>("/api/menu", { cache: "force-cache" });
                 if (!items.length || !mounted) return;
 
                 const featuredPool = items.some((item) => item.isPopular)
@@ -60,6 +94,10 @@ export default function HomePage() {
                 }
             } catch {
                 // Keep local fallback list when backend is unavailable.
+            } finally {
+                if (mounted) {
+                    setIsDishesLoading(false);
+                }
             }
         }
 
@@ -70,15 +108,107 @@ export default function HomePage() {
         };
     }, []);
 
-    const ctaActions = [
-        { title: "Reserve a Table", subtitle: "Book your premium dining experience", href: "/reserve-table", icon: "🍽️" },
-        { title: "Dine In Now", subtitle: "Walk-in or call for instant seating", href: "/contact", icon: "👥" },
-        { title: "Takeaway", subtitle: "Order ahead for quick pickup", href: "/takeaway", icon: "🛍️" },
-        { title: "Order Online", subtitle: "Home delivery with premium packaging", href: "/order-online", icon: "📦" },
-    ];
+    useEffect(() => {
+        let mounted = true;
+
+        async function loadPromoBanners() {
+            try {
+                const result = await apiFetch<PromoBanner[]>(`/api/promo-banners/public?t=${Date.now()}`, { cache: "no-store" });
+                if (!mounted) return;
+                setPromoBanners(Array.isArray(result) ? result.slice(0, 3) : []);
+            } catch {
+                if (!mounted) return;
+                setPromoBanners([]);
+            }
+        }
+
+        void loadPromoBanners();
+
+        return () => {
+            mounted = false;
+        };
+    }, []);
+
+    useEffect(() => {
+        if (activePromoIndex < promoBanners.length) {
+            return;
+        }
+
+        setActivePromoIndex(0);
+    }, [activePromoIndex, promoBanners.length]);
+
+    useEffect(() => {
+        if (promoBanners.length <= 1) {
+            return;
+        }
+
+        const timer = setInterval(() => {
+            setActivePromoIndex((prev) => (prev + 1) % promoBanners.length);
+        }, 4000);
+
+        return () => {
+            clearInterval(timer);
+        };
+    }, [promoBanners]);
 
     return (
         <div className="space-y-24 pb-20">
+            {/* 0. PROMO BANNER */}
+            {promoBanners.length ? (
+                <SectionReveal direction="up" className="mx-auto max-w-6xl px-6 pt-6 md:px-10">
+                    <motion.div
+                        key={promoBanners[activePromoIndex]?._id || activePromoIndex}
+                        initial={{ opacity: 0, y: 14 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="relative overflow-hidden rounded-3xl border border-[#CFAF63]/25"
+                    >
+                        <div
+                            className="absolute inset-0 bg-cover bg-center"
+                            style={{
+                                backgroundImage: promoBanners[activePromoIndex]?.image
+                                    ? `linear-gradient(90deg, rgba(8,8,8,0.88), rgba(8,8,8,0.65)), url(${promoBanners[activePromoIndex].image})`
+                                    : "linear-gradient(90deg, rgba(12,11,8,0.94), rgba(26,20,12,0.9))",
+                            }}
+                        />
+                        <div className="relative z-10 p-6 md:p-10">
+                            <p className="text-xs uppercase tracking-[0.18em] text-[#CFAF63]">Today&apos;s Offers</p>
+                            <h3 className="mt-2 font-[var(--font-heading)] text-3xl text-[#F5F5F5] md:text-4xl">
+                                {promoBanners[activePromoIndex]?.title}
+                            </h3>
+                            {promoBanners[activePromoIndex]?.subtitle ? (
+                                <p className="mt-2 max-w-2xl text-sm text-[#F5F5F5]/80 md:text-base">{promoBanners[activePromoIndex].subtitle}</p>
+                            ) : null}
+                            {promoBanners[activePromoIndex]?.couponCode ? (
+                                <p className="mt-4 inline-flex rounded-full border border-[#CFAF63]/35 bg-[#0f0f0f]/70 px-4 py-1.5 text-sm text-[#F5F5F5]">
+                                    Use Code: <span className="ml-2 font-semibold text-[#CFAF63]">{promoBanners[activePromoIndex].couponCode}</span>
+                                </p>
+                            ) : null}
+                            <div className="mt-5 flex items-center gap-3">
+                                <Link
+                                    href={promoBanners[activePromoIndex]?.ctaLink || "/menu"}
+                                    className="rounded-full bg-gradient-to-r from-[#CFAF63] to-[#FF6A00] px-6 py-2.5 text-sm font-semibold text-[#111]"
+                                >
+                                    {promoBanners[activePromoIndex]?.ctaText || "Explore Offer"}
+                                </Link>
+                                {promoBanners.length > 1 ? (
+                                    <div className="flex items-center gap-2">
+                                        {promoBanners.map((banner, index) => (
+                                            <button
+                                                key={banner._id}
+                                                type="button"
+                                                onClick={() => setActivePromoIndex(index)}
+                                                className={`h-2.5 rounded-full transition ${index === activePromoIndex ? "w-8 bg-[#CFAF63]" : "w-2.5 bg-[#F5F5F5]/50"}`}
+                                                aria-label={`Go to promo slide ${index + 1}`}
+                                            />
+                                        ))}
+                                    </div>
+                                ) : null}
+                            </div>
+                        </div>
+                    </motion.div>
+                </SectionReveal>
+            ) : null}
+
             {/* 1. HERO - Fire & Flame */}
             <HeroSection />
 
@@ -88,7 +218,7 @@ export default function HomePage() {
                 <h2 className="mt-2 font-[var(--font-heading)] text-4xl text-[#F5F5F5]">Experience Cafe Maza</h2>
                 <GoldDivider className="max-w-md" />
                 <div className="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-4">
-                    {ctaActions.map((action, idx) => (
+                    {CTA_ACTIONS.map((action, idx) => (
                         <motion.a
                             key={action.href}
                             href={action.href}
@@ -117,9 +247,20 @@ export default function HomePage() {
                     <GoldDivider className="max-w-sm" />
                 </div>
                 <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-                    {signatureDishes.map((dish) => (
-                        <DishCard key={dish.name} dish={dish} />
-                    ))}
+                    {isDishesLoading
+                        ? Array.from({ length: 6 }).map((_, idx) => (
+                            <div key={idx} className="h-64 animate-pulse rounded-2xl border border-[#CFAF63]/15 bg-[#121212]" />
+                        ))
+                        : signatureDishes.map((dish) => (
+                            <Link
+                                key={dish.name}
+                                href={`/menu?item=${encodeURIComponent(dish.name)}`}
+                                aria-label={`View ${dish.name} in menu`}
+                                className="block"
+                            >
+                                <DishCard dish={dish} />
+                            </Link>
+                        ))}
                 </div>
             </SectionReveal>
 
@@ -222,7 +363,7 @@ export default function HomePage() {
                                 className="mt-8"
                             >
                                 <motion.button
-                                    onClick={() => setShowScreeningModal(true)}
+                                    onClick={openScreeningModal}
                                     whileHover={{ scale: 1.04 }}
                                     whileTap={{ scale: 0.97 }}
                                     className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#CFAF63] to-[#FF6A00] px-8 py-3.5 font-semibold text-[#111] shadow-[0_0_30px_rgba(207,175,99,0.25)] hover:shadow-[0_0_45px_rgba(207,175,99,0.45)] transition"
@@ -318,7 +459,7 @@ export default function HomePage() {
                 </div>
             </SectionReveal>
 
-            {showScreeningModal && <ScreeningBookingModal onClose={() => setShowScreeningModal(false)} />}
+            {showScreeningModal && <ScreeningBookingModal onClose={closeScreeningModal} />}
 
             {/* 5. LIVE GRILL EXPERIENCE */}
             <SectionReveal className="mx-auto max-w-6xl px-6 md:px-10">
@@ -344,43 +485,6 @@ export default function HomePage() {
                 <GoldDivider className="max-w-sm" />
                 <div className="mt-8">
                     <TestimonialsCarousel />
-                </div>
-            </SectionReveal>
-
-            <SectionReveal direction="right" className="mx-auto max-w-6xl px-6 md:px-10">
-                <ChefStorySection />
-            </SectionReveal>
-
-            {/* 6. PREMIUM AMBIANCE GALLERY */}
-            <SectionReveal className="mx-auto max-w-6xl px-6 md:px-10">
-                <p className="text-sm uppercase tracking-[0.2em] text-[#CFAF63]">Visual Journey</p>
-                <h2 className="mt-2 font-[var(--font-heading)] text-4xl text-[#F5F5F5]">Premium Ambiance Gallery</h2>
-                <p className="mt-3 text-[#F5F5F5]/70 max-w-lg">Experience the luxury of our dining spaces.</p>
-                <GoldDivider className="max-w-lg" />
-                <div className="mt-8 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {premiumPhotos.map((photo, idx) => (
-                        <motion.figure
-                            key={idx}
-                            initial={{ opacity: 0, y: 20 }}
-                            whileInView={{ opacity: 1, y: 0 }}
-                            viewport={{ once: true, amount: 0.2 }}
-                            transition={{ duration: 0.45, delay: idx * 0.08 }}
-                            whileHover={{ y: -8 }}
-                            className="glass-card smart-card overflow-hidden rounded-2xl border border-[#CFAF63]/20 group"
-                        >
-                            <div className="relative h-56 overflow-hidden">
-                                <Image
-                                    src={photo.src}
-                                    alt={photo.caption}
-                                    fill
-                                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                                    className="object-cover transition duration-500 group-hover:scale-110"
-                                />
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-black/10 to-transparent" />
-                            </div>
-                            <figcaption className="px-4 py-3 text-sm text-[#F5F5F5]/80">{photo.caption}</figcaption>
-                        </motion.figure>
-                    ))}
                 </div>
             </SectionReveal>
 

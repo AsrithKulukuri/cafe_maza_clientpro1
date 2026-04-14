@@ -22,6 +22,11 @@ function getOptimizedImageSrc(src: string) {
         return `${src}${separator}width=640&quality=55`;
     }
 
+    // Reject pasted Unsplash photo-page URLs; next/image only accepts direct image hosts.
+    if (src.includes("unsplash.com/photos/")) {
+        return "/images/soup.jpg";
+    }
+
     // Unsplash supports URL transforms to deliver lighter images.
     if (src.includes("images.unsplash.com")) {
         const separator = src.includes("?") ? "&" : "?";
@@ -62,7 +67,7 @@ export const DishCard = memo(function DishCard({ dish, onAdd, priority = false }
                     alt={dish.name}
                     fill
                     sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                    quality={60}
+                    quality={75}
                     priority={priority}
                     loading={priority ? "eager" : "lazy"}
                     fetchPriority={priority ? "high" : "low"}

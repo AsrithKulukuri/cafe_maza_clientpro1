@@ -2,6 +2,13 @@ export type AppUser = {
     id: string;
     name: string;
     email: string;
+    phone?: string;
+    savedAddress?: string;
+    savedLocation?: {
+        latitude: number;
+        longitude: number;
+        updatedAt?: string;
+    } | null;
     role: "customer" | "staff" | "bearer" | "kitchen" | "manager" | "delivery" | "admin";
 };
 

@@ -134,6 +134,14 @@ export function Navbar() {
                                     My Orders
                                 </Link>
                             </motion.div>
+                            <motion.div
+                                whileHover={{ y: -2 }}
+                                className="hidden sm:block"
+                            >
+                                <Link href="/profile" className="rounded-full border border-[#6CA3EA]/40 px-4 py-2 text-xs text-[#6CA3EA] hover:border-[#3B82F6] transition">
+                                    Profile
+                                </Link>
+                            </motion.div>
                             <motion.button
                                 whileHover={{ y: -2 }}
                                 onClick={() => void handleLogout()}
@@ -202,6 +210,11 @@ export function Navbar() {
                                     <li className="py-3 border-b border-[#CFAF63]/10">
                                         <Link href="/my-orders" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-[#CFAF63]">
                                             My Orders
+                                        </Link>
+                                    </li>
+                                    <li className="py-3 border-b border-[#CFAF63]/10">
+                                        <Link href="/profile" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-[#6CA3EA]">
+                                            Profile
                                         </Link>
                                     </li>
                                     <li className="py-3 border-b border-[#CFAF63]/10">
