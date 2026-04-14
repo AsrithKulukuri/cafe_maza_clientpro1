@@ -54,7 +54,7 @@ export function GlobalPageNav() {
     }
 
     return (
-        <header className="sticky top-0 z-[70] border-b border-[#CFAF63]/20 bg-[#0B0B0B]/95 backdrop-blur-xl">
+        <header className="sticky top-0 z-70 border-b border-[#CFAF63]/20 bg-[#0B0B0B]/95 backdrop-blur-xl">
             <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 md:px-8">
                 <div className="flex items-center gap-3">
                     <button
@@ -79,7 +79,7 @@ export function GlobalPageNav() {
                     </Link>
                     <Link
                         href="/"
-                        className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#CFAF63] to-[#FF6A00] px-3 py-2 text-xs font-semibold text-[#111]"
+                        className="inline-flex items-center gap-2 rounded-full bg-linear-to-r from-[#CFAF63] to-[#FF6A00] px-3 py-2 text-xs font-semibold text-[#111]"
                     >
                         <Home size={14} />
                         Home
