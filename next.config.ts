@@ -1,5 +1,7 @@
 import type { NextConfig } from "next";
 
+const backendOrigin = process.env.BACKEND_ORIGIN || "http://127.0.0.1:5000";
+
 const nextConfig: NextConfig = {
   turbopack: {
     root: process.cwd(),
@@ -29,15 +31,15 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/backend/socket.io",
-        destination: "http://127.0.0.1:5000/socket.io/",
+        destination: `${backendOrigin}/socket.io/`,
       },
       {
         source: "/backend/socket.io/:path*",
-        destination: "http://127.0.0.1:5000/socket.io/:path*",
+        destination: `${backendOrigin}/socket.io/:path*`,
       },
       {
         source: "/backend/:path*",
-        destination: "http://127.0.0.1:5000/:path*",
+        destination: `${backendOrigin}/:path*`,
       },
     ];
   },

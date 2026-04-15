@@ -45,6 +45,7 @@ function mapBackendToCategories(items: BackendMenuItem[]): MenuCategoryView[] {
         const key = (item.category || "uncategorized").toLowerCase().trim().replace(/\s+/g, "-");
         const current = grouped.get(key) ?? [];
         current.push({
+            _id: item._id,
             name: item.name,
             price: item.price,
             image: item.image || "/images/soup.jpg",
