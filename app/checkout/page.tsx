@@ -437,7 +437,7 @@ export default function CheckoutPage() {
         let cancelled = false;
         async function loadBestCoupon() {
             try {
-                const result = await apiFetch<BestCouponResponse>(`/api/orders/best-coupon?subtotal=${subtotal}`);
+                const result = await apiFetch<BestCouponResponse>(`/api/orders/best-coupon?subtotal=${subtotal}`, { cache: "no-store" });
                 if (cancelled) return;
                 setBestCoupon(result.bestCoupon);
             } catch {
@@ -608,37 +608,14 @@ export default function CheckoutPage() {
         setCouponMessage("");
 
         try {
-            const token = getAuthToken();
             const items = await resolveBackendItems();
 
             const payload = JSON.stringify({ code: normalizedCode, items });
-            let response: AppliedCouponResponse;
-
-            if (token) {
-                try {
-                    response = await apiFetch<AppliedCouponResponse>("/api/orders/apply-coupon", {
-                        method: "POST",
-                        token,
-                        body: payload,
-                    });
-                } catch (error) {
-                    if (!isAuthFailureMessage(error)) {
-                        throw error;
-                    }
-
-                    response = await apiFetch<AppliedCouponResponse>("/api/orders/apply-coupon/public", {
-                        method: "POST",
-                        token: "",
-                        body: payload,
-                    });
-                }
-            } else {
-                response = await apiFetch<AppliedCouponResponse>("/api/orders/apply-coupon/public", {
-                    method: "POST",
-                    token: "",
-                    body: payload,
-                });
-            }
+            const response = await apiFetch<AppliedCouponResponse>("/api/orders/apply-coupon/public", {
+                method: "POST",
+                token: "",
+                body: payload,
+            });
 
             setAppliedCoupon(response);
             setCouponInput(response.code);
@@ -673,28 +650,10 @@ export default function CheckoutPage() {
 
         setLoadingAvailableCoupons(true);
         try {
-            const token = getAuthToken();
-            let response: AvailableCouponsResponse;
-
-            if (token) {
-                try {
-                    response = await apiFetch<AvailableCouponsResponse>(`/api/orders/available-coupons?subtotal=${subtotal}`, {
-                        token,
-                    });
-                } catch (error) {
-                    if (!isAuthFailureMessage(error)) {
-                        throw error;
-                    }
-
-                    response = await apiFetch<AvailableCouponsResponse>(`/api/orders/available-coupons/public?subtotal=${subtotal}`, {
-                        token: "",
-                    });
-                }
-            } else {
-                response = await apiFetch<AvailableCouponsResponse>(`/api/orders/available-coupons/public?subtotal=${subtotal}`, {
-                    token: "",
-                });
-            }
+            const response = await apiFetch<AvailableCouponsResponse>(`/api/orders/available-coupons/public?subtotal=${subtotal}`, {
+                token: "",
+                cache: "no-store",
+            });
 
             setAvailableCoupons(response.coupons || []);
         } catch {
