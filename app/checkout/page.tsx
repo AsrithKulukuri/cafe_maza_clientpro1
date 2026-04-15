@@ -119,6 +119,11 @@ function normalizeDishName(value: string) {
         .replace(/\s+/g, " ");
 }
 
+function isAuthFailureMessage(error: unknown) {
+    const message = error instanceof Error ? error.message : String(error || "");
+    return /unauthorized|invalid token|forbidden|not authorized/i.test(message);
+}
+
 type RazorpayPaymentResult = {
     razorpay_payment_id: string;
     razorpay_order_id: string;
@@ -617,8 +622,7 @@ export default function CheckoutPage() {
                         body: payload,
                     });
                 } catch (error) {
-                    const message = error instanceof Error ? error.message : "";
-                    if (!message.toLowerCase().includes("unauthorized")) {
+                    if (!isAuthFailureMessage(error)) {
                         throw error;
                     }
 
@@ -678,8 +682,7 @@ export default function CheckoutPage() {
                         token,
                     });
                 } catch (error) {
-                    const message = error instanceof Error ? error.message : "";
-                    if (!message.toLowerCase().includes("unauthorized")) {
+                    if (!isAuthFailureMessage(error)) {
                         throw error;
                     }
 
