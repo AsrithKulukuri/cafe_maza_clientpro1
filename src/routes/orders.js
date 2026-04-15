@@ -60,6 +60,10 @@ function normalizeOrderType(rawOrderType, tableNumber) {
     return "delivery";
 }
 
+function escapeRegExp(value) {
+    return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function getRazorpayClient() {
     const keyId = process.env.RAZORPAY_KEY_ID;
     const keySecret = process.env.RAZORPAY_KEY_SECRET;
@@ -77,24 +81,59 @@ function getRazorpayClient() {
     };
 }
 
+async function resolveMenuItemFromPayload(item) {
+    const providedMenuItemId = String(item?.menuItemId || "").trim();
+
+    if (providedMenuItemId) {
+        const menuItem = await MenuItem.findById(providedMenuItemId);
+        if (menuItem) {
+            return menuItem;
+        }
+    }
+
+    const providedName = String(item?.name || "").trim();
+    const providedPrice = Number(item?.price);
+
+    if (!providedName || !Number.isFinite(providedPrice)) {
+        throw new Error("One or more menu items are invalid");
+    }
+
+    const existing = await MenuItem.findOne({
+        name: { $regex: `^${escapeRegExp(providedName)}$`, $options: "i" },
+    });
+
+    if (existing) {
+        return existing;
+    }
+
+    return MenuItem.create({
+        name: providedName,
+        category: String(item?.category || "Uncategorized").trim() || "Uncategorized",
+        price: providedPrice,
+        image: String(item?.image || "").trim(),
+        isVeg: Boolean(item?.isVeg),
+        isPopular: Boolean(item?.isPopular),
+        isBestSeller: Boolean(item?.isBestSeller),
+        isSoldOut: Boolean(item?.isSoldOut),
+        tags: Array.isArray(item?.tags)
+            ? item.tags.map((tag) => String(tag).trim().toLowerCase()).filter(Boolean)
+            : [],
+    });
+}
+
 async function resolveMenuItemsAndTotal(items) {
     if (!Array.isArray(items) || items.length === 0) {
         throw new Error("items are required");
     }
 
-    const itemIds = items.map((i) => i.menuItemId);
-    const menuItems = await MenuItem.find({ _id: { $in: itemIds } });
+    const menuItems = [];
+    let subtotal = 0;
 
-    const priceById = new Map(menuItems.map((m) => [m._id.toString(), m.price]));
-    const missing = items.find((i) => !priceById.has(String(i.menuItemId)));
-
-    if (missing) {
-        throw new Error("One or more menu items are invalid");
+    for (const item of items) {
+        const menuItem = await resolveMenuItemFromPayload(item);
+        menuItems.push(menuItem);
+        subtotal += Number(menuItem.price || 0) * Number(item.quantity || 0);
     }
-
-    const subtotal = items.reduce((sum, item) => {
-        return sum + priceById.get(String(item.menuItemId)) * item.quantity;
-    }, 0);
 
     return { menuItems, subtotal };
 }
