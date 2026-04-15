@@ -606,16 +606,35 @@ export default function CheckoutPage() {
             const token = getAuthToken();
             const items = await resolveBackendItems();
 
-            const response = token
-                ? await apiFetch<AppliedCouponResponse>("/api/orders/apply-coupon", {
+            const payload = JSON.stringify({ code: normalizedCode, items });
+            let response: AppliedCouponResponse;
+
+            if (token) {
+                try {
+                    response = await apiFetch<AppliedCouponResponse>("/api/orders/apply-coupon", {
+                        method: "POST",
+                        token,
+                        body: payload,
+                    });
+                } catch (error) {
+                    const message = error instanceof Error ? error.message : "";
+                    if (!message.toLowerCase().includes("unauthorized")) {
+                        throw error;
+                    }
+
+                    response = await apiFetch<AppliedCouponResponse>("/api/orders/apply-coupon/public", {
+                        method: "POST",
+                        token: "",
+                        body: payload,
+                    });
+                }
+            } else {
+                response = await apiFetch<AppliedCouponResponse>("/api/orders/apply-coupon/public", {
                     method: "POST",
-                    token,
-                    body: JSON.stringify({ code: normalizedCode, items }),
-                })
-                : await apiFetch<AppliedCouponResponse>("/api/orders/apply-coupon/public", {
-                    method: "POST",
-                    body: JSON.stringify({ code: normalizedCode, items }),
+                    token: "",
+                    body: payload,
                 });
+            }
 
             setAppliedCoupon(response);
             setCouponInput(response.code);
@@ -651,10 +670,29 @@ export default function CheckoutPage() {
         setLoadingAvailableCoupons(true);
         try {
             const token = getAuthToken();
-            const endpoint = token
-                ? `/api/orders/available-coupons?subtotal=${subtotal}`
-                : `/api/orders/available-coupons/public?subtotal=${subtotal}`;
-            const response = await apiFetch<AvailableCouponsResponse>(endpoint);
+            let response: AvailableCouponsResponse;
+
+            if (token) {
+                try {
+                    response = await apiFetch<AvailableCouponsResponse>(`/api/orders/available-coupons?subtotal=${subtotal}`, {
+                        token,
+                    });
+                } catch (error) {
+                    const message = error instanceof Error ? error.message : "";
+                    if (!message.toLowerCase().includes("unauthorized")) {
+                        throw error;
+                    }
+
+                    response = await apiFetch<AvailableCouponsResponse>(`/api/orders/available-coupons/public?subtotal=${subtotal}`, {
+                        token: "",
+                    });
+                }
+            } else {
+                response = await apiFetch<AvailableCouponsResponse>(`/api/orders/available-coupons/public?subtotal=${subtotal}`, {
+                    token: "",
+                });
+            }
+
             setAvailableCoupons(response.coupons || []);
         } catch {
             setAvailableCoupons([]);
