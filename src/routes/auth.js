@@ -386,22 +386,39 @@ router.post("/register-staff", async (req, res, next) => {
 
 router.post("/login", async (req, res, next) => {
     try {
-        const { email, password } = req.body;
+        const rawIdentifier = String(req.body?.email || req.body?.identifier || "").trim();
+        const password = String(req.body?.password || "");
 
-        if (!email || !password) {
+        if (!rawIdentifier || !password) {
             return res.status(400).json({ message: "email and password are required" });
         }
 
-        const user = await User.findOne({ email: email.toLowerCase() });
+        const normalizedEmail = rawIdentifier.toLowerCase();
+        const user = await User.findOne({
+            $or: [
+                { email: normalizedEmail },
+                { phone: rawIdentifier },
+            ],
+        });
 
         if (!user) {
             return res.status(401).json({ message: "Invalid credentials" });
         }
 
-        const matched = await bcrypt.compare(password, user.password);
+        const storedPassword = String(user.password || "");
+        const isBcryptHash = /^\$2[aby]\$\d{2}\$/.test(storedPassword);
+        const matched = isBcryptHash
+            ? await bcrypt.compare(password, storedPassword)
+            : password === storedPassword;
 
         if (!matched) {
             return res.status(401).json({ message: "Invalid credentials" });
+        }
+
+        // One-time migration path for legacy plaintext passwords.
+        if (!isBcryptHash) {
+            user.password = await bcrypt.hash(password, 10);
+            await user.save();
         }
 
         const token = generateToken(user);
