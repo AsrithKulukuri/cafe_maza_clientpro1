@@ -22,6 +22,18 @@ type BackendMenuItem = {
     name: string;
 };
 
+type CheckoutOrderItem = {
+    menuItemId?: string;
+    name: string;
+    price: number;
+    quantity: number;
+    image?: string;
+    isVeg?: boolean;
+    isBestSeller?: boolean;
+    isSoldOut?: boolean;
+    tags?: string[];
+};
+
 type CreatedOrder = {
     _id: string;
     paymentStatus: "success" | "paid" | "pending";
@@ -98,6 +110,13 @@ const currencyFormatter = new Intl.NumberFormat("en-IN", {
 
 function formatCurrency(value: number) {
     return currencyFormatter.format(value);
+}
+
+function normalizeDishName(value: string) {
+    return String(value || "")
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, " ");
 }
 
 type RazorpayPaymentResult = {
@@ -523,18 +542,44 @@ export default function CheckoutPage() {
         [updateAddressFromPoint],
     );
 
-    const resolveBackendItems = useCallback(async () => {
-        const menu = await apiFetch<BackendMenuItem[]>("/api/menu");
-        const menuIdByName = new Map(menu.map((item) => [item.name.toLowerCase(), item._id]));
+    const resolveBackendItems = useCallback(async (): Promise<CheckoutOrderItem[]> => {
+        try {
+            const menu = await apiFetch<BackendMenuItem[]>("/api/menu");
+            const menuIdByName = new Map(menu.map((item) => [normalizeDishName(item.name), item._id]));
+            const validMenuIds = new Set(menu.map((item) => item._id));
 
-        return cart.map((item) => {
-            const menuItemId = menuIdByName.get(item.name.toLowerCase());
-            if (!menuItemId) {
-                throw new Error(`Menu item not found in backend: ${item.name}`);
-            }
+            return cart.map((item) => {
+                const menuItemId = item._id && validMenuIds.has(item._id)
+                    ? item._id
+                    : menuIdByName.get(normalizeDishName(item.name));
 
-            return { menuItemId, quantity: item.qty };
-        });
+                if (menuItemId) {
+                    return { menuItemId, quantity: item.qty, name: item.name, price: item.price };
+                }
+
+                return {
+                    name: item.name,
+                    price: item.price,
+                    quantity: item.qty,
+                    image: item.image,
+                    isVeg: item.isVeg,
+                    isBestSeller: item.isBestSeller,
+                    isSoldOut: item.isSoldOut,
+                    tags: item.tags,
+                };
+            });
+        } catch {
+            return cart.map((item) => ({
+                name: item.name,
+                price: item.price,
+                quantity: item.qty,
+                image: item.image,
+                isVeg: item.isVeg,
+                isBestSeller: item.isBestSeller,
+                isSoldOut: item.isSoldOut,
+                tags: item.tags,
+            }));
+        }
     }, [cart]);
 
     const applyCoupon = useCallback(async (manualCode?: string) => {
@@ -769,7 +814,7 @@ export default function CheckoutPage() {
                     className="glass-card mt-10 rounded-3xl border border-[#CFAF63]/25 p-8 text-center"
                 >
                     <p className="text-sm uppercase tracking-[0.2em] text-[#00D98E]">Order Confirmed</p>
-                    <h1 className="mt-2 font-[var(--font-heading)] text-5xl text-[#F5F5F5]">Thank You</h1>
+                    <h1 className="mt-2 font-(--font-heading) text-5xl text-[#F5F5F5]">Thank You</h1>
                     <p className="mt-4 text-[#F5F5F5]/75">
                         Your order has been placed successfully. You can track it live from the order tracking page.
                     </p>
@@ -787,7 +832,7 @@ export default function CheckoutPage() {
         <div className="mx-auto grid max-w-6xl gap-8 px-6 pb-20 md:grid-cols-[1.1fr_0.9fr] md:px-10">
             <section className="glass-card rounded-3xl border border-[#CFAF63]/20 p-7">
                 <p className="text-sm uppercase tracking-[0.2em] text-[#CFAF63]">Checkout</p>
-                <h1 className="mt-2 font-[var(--font-heading)] text-4xl text-[#F5F5F5]">Complete Your Order</h1>
+                <h1 className="mt-2 font-(--font-heading) text-4xl text-[#F5F5F5]">Complete Your Order</h1>
 
                 <div className="mt-6 space-y-4">
                     <label className="block text-sm text-[#F5F5F5]/75">
@@ -870,7 +915,7 @@ export default function CheckoutPage() {
             </section>
 
             <aside className="glass-card h-fit rounded-3xl border border-[#CFAF63]/20 p-7">
-                <h2 className="font-[var(--font-heading)] text-3xl text-[#F5F5F5]">Order Summary</h2>
+                <h2 className="font-(--font-heading) text-3xl text-[#F5F5F5]">Order Summary</h2>
                 <div className="mt-4 rounded-2xl border border-[#CFAF63]/20 bg-[#121212] p-3">
                     <div className="mb-2 flex items-center justify-between gap-2">
                         <p className="text-xs uppercase tracking-[0.14em] text-[#CFAF63]">Coupon</p>
@@ -1032,7 +1077,7 @@ export default function CheckoutPage() {
                 <button
                     onClick={placeOrder}
                     disabled={!cart.length || placing || !minimumOrderMet}
-                    className="mt-5 w-full rounded-full bg-gradient-to-r from-[#CFAF63] via-[#FFD78B] to-[#FF6A00] px-4 py-3 font-semibold text-[#111] disabled:opacity-50"
+                    className="mt-5 w-full rounded-full bg-linear-to-r from-[#CFAF63] via-[#FFD78B] to-[#FF6A00] px-4 py-3 font-semibold text-[#111] disabled:opacity-50"
                 >
                     {placing ? "Processing..." : form.payment === "Cash" ? "Place Order" : "Pay & Place Order"}
                 </button>
