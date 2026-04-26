@@ -7,7 +7,7 @@ import { Order } from "../models/Order.js";
 import { MenuItem } from "../models/MenuItem.js";
 import { Coupon } from "../models/Coupon.js";
 import { User } from "../models/User.js";
-import { auth } from "../middlewares/auth.js";
+import { auth, optionalAuth } from "../middlewares/auth.js";
 import { permit } from "../middlewares/roles.js";
 import { getSocketIO } from "../config/socket.js";
 import { sendOrderNotificationEmail } from "../utils/orderEmail.js";
@@ -602,10 +602,10 @@ async function applyCouponFromRequest(req, res, next) {
     }
 }
 
-router.post("/apply-coupon", auth, applyCouponFromRequest);
+router.post("/apply-coupon", optionalAuth, applyCouponFromRequest);
 router.post("/apply-coupon/public", applyCouponFromRequest);
 
-router.get("/best-coupon", async (req, res, next) => {
+router.get("/best-coupon", optionalAuth, async (req, res, next) => {
     try {
         const subtotal = Number(req.query.subtotal || 0);
         const applyDeliveryCharge = normalizeOrderType(req.query.orderType, req.query.tableNumber) === "delivery";
@@ -701,7 +701,7 @@ async function listAvailableCoupons(req, res, next) {
     }
 }
 
-router.get("/available-coupons", auth, listAvailableCoupons);
+router.get("/available-coupons", optionalAuth, listAvailableCoupons);
 router.get("/available-coupons/public", listAvailableCoupons);
 
 router.get("/tables/active", auth, permit("admin", "manager", "staff", "bearer", "kitchen"), async (req, res, next) => {
