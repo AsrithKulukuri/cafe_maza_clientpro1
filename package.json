@@ -1,0 +1,10 @@
+{
+  "scripts": {
+    "dev:frontend": "npm --prefix cafe-maza-web run dev",
+    "dev:backend": "npm --prefix backend run dev"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.9.0",
+    "@supabase/supabase-js": "^2.99.2"
+  }
+}

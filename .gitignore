@@ -1,0 +1,12 @@
+# Backend local secrets
+backend/.env
+backend/.env.local
+backend/.env.*.local
+
+# Node modules
+backend/node_modules/
+cafe-maza-web/node_modules/
+
+# Build artifacts
+cafe-maza-web/.next/
+backend/dist/
