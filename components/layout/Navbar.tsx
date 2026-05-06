@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import type { User } from "@supabase/supabase-js";
@@ -23,7 +23,7 @@ export function Navbar() {
     const portalsMenuRef = useRef<HTMLDivElement | null>(null);
     const pathname = usePathname();
     const { cartCount, openCart, openBooking } = usePremiumUI();
-    const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+    const supabase = createSupabaseBrowserClient();
 
     useEffect(() => {
         const onScroll = () => setScrolled(window.scrollY > 20);
@@ -71,11 +71,18 @@ export function Navbar() {
     useEffect(() => {
         let mounted = true;
 
-        supabase.auth.getUser().then(({ data }) => {
-            if (mounted) {
-                setSupabaseUser(data.user ?? null);
-            }
-        });
+        supabase.auth
+            .getSession()
+            .then(({ data }) => {
+                if (mounted) {
+                    setSupabaseUser(data.session?.user ?? null);
+                }
+            })
+            .catch(() => {
+                if (mounted) {
+                    setSupabaseUser(null);
+                }
+            });
 
         const { data } = supabase.auth.onAuthStateChange((_event, session) => {
             setSupabaseUser(session?.user ?? null);
@@ -92,7 +99,7 @@ export function Navbar() {
         setUser(null);
 
         if (supabaseUser) {
-            await supabase.auth.signOut();
+            await supabase.auth.signOut({ scope: "local" });
             setSupabaseUser(null);
         }
     };

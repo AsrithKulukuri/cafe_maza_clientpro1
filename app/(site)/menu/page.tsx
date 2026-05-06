@@ -70,7 +70,7 @@ export default function MenuPage() {
     const [searchQuery, setSearchQuery] = useState("");
     const [loadingGrid, setLoadingGrid] = useState(true);
     const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
-    const { addToCart: addDishToCart, cartCount, cartTotal, openCart, pushToast } = usePremiumUI();
+    const { addToCart: addDishToCart, pushToast } = usePremiumUI();
     const deferredSearchQuery = useDeferredValue(searchQuery);
 
     const filteredCategories = useMemo(() => {
@@ -144,6 +144,8 @@ export default function MenuPage() {
     };
 
     return (
+
+
         <div className="mx-auto max-w-7xl px-6 pb-20 md:px-10">
             <SectionReveal className="mb-6 section-glow">
                 <p className="text-sm uppercase tracking-[0.2em] text-[#CFAF63]">Interactive Menu</p>
@@ -155,22 +157,23 @@ export default function MenuPage() {
                 </p>
             </SectionReveal>
 
-            <div className="fixed left-1/2 top-20 z-30 w-[calc(100%-3rem)] max-w-304 -translate-x-1/2 rounded-2xl border border-[#D4AF37]/18 bg-[#101010]/70 p-3 backdrop-blur-xl md:top-22">
-                <div className="relative mb-3">
+            {/* Compact search and categories toolbar */}
+            <div className="w-full max-w-304 mx-auto rounded-xl border border-[#D4AF37]/18 bg-[#101010]/80 px-2 py-2 flex flex-col gap-2 md:flex-row md:items-center md:gap-3 md:px-4 md:py-2 mb-4">
+                <div className="relative flex-1 min-w-0">
                     <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#D4AF37]/75" />
                     <input
                         value={searchQuery}
                         onChange={(event) => setSearchQuery(event.target.value)}
                         placeholder="Search dishes"
-                        className="w-full rounded-xl border border-[#D4AF37]/20 bg-[#0E0E0E]/85 py-2.5 pl-9 pr-3 text-sm text-[#F5F5F5] outline-none transition focus:border-[#D4AF37]"
+                        className="w-full rounded-xl border border-[#D4AF37]/20 bg-[#0E0E0E]/85 py-2 pl-9 pr-3 text-sm text-[#F5F5F5] outline-none transition focus:border-[#D4AF37]"
                     />
                 </div>
-                <div className="flex gap-2 overflow-x-auto pb-1">
+                <div className="flex flex-wrap gap-2 overflow-x-auto md:overflow-visible md:flex-nowrap">
                     {categories.map((category) => (
                         <button
                             key={category.id}
                             onClick={() => scrollToCategory(category.id)}
-                            className={`shrink-0 rounded-full border px-4 py-2 text-xs transition ${active === category.id
+                            className={`rounded-full border px-4 py-2 text-xs transition whitespace-nowrap ${active === category.id
                                 ? "border-[#D4AF37] bg-[#D4AF37]/15 text-[#F5F5F5]"
                                 : "border-[#D4AF37]/25 bg-[#151515]/85 text-[#F5F5F5]/75 hover:border-[#D4AF37]/55 hover:text-[#D4AF37]"
                                 }`}
@@ -181,7 +184,8 @@ export default function MenuPage() {
                 </div>
             </div>
 
-            <div className="mb-4 h-29.5 md:mb-8 md:h-31.5" aria-hidden="true" />
+            {/* Remove the large spacer, use a small one for separation */}
+            <div className="mb-2 md:mb-4" aria-hidden="true" />
 
             {loadingGrid ? (
                 <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
@@ -225,17 +229,6 @@ export default function MenuPage() {
                 </div>
             )}
 
-            {cartCount > 0 ? (
-                <div className="fixed bottom-20 left-1/2 z-40 w-[min(94%,680px)] -translate-x-1/2 rounded-2xl border border-[#CFAF63]/35 bg-[#101010]/95 px-4 py-3 backdrop-blur-xl lg:bottom-5">
-                    <div className="flex items-center justify-between gap-4">
-                        <div>
-                            <p className="text-xs uppercase tracking-[0.12em] text-[#999]">Cart Ready</p>
-                            <p className="text-sm text-[#F5F5F5]">{cartCount} items • ₹{cartTotal}</p>
-                        </div>
-                        <button onClick={openCart} className="luxury-button px-5 py-2 text-xs md:text-sm">Open Cart</button>
-                    </div>
-                </div>
-            ) : null}
         </div>
     );
 }

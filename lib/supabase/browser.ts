@@ -8,5 +8,12 @@ export function createSupabaseBrowserClient() {
     return createBrowserClient(
         getRequiredPublicEnv("NEXT_PUBLIC_SUPABASE_URL"),
         getRequiredPublicEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
+        {
+            auth: {
+                autoRefreshToken: false,
+                detectSessionInUrl: false,
+                persistSession: true,
+            },
+        },
     );
 }

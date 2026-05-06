@@ -93,7 +93,8 @@ export default function MyOrdersDashboard() {
                     setUser({ name: appUser.name, email: appUser.email });
                 } else {
                     const supabase = createSupabaseBrowserClient();
-                    const { data: { user: supabaseUser } } = await supabase.auth.getUser();
+                    const { data: { session } } = await supabase.auth.getSession();
+                    const supabaseUser = session?.user ?? null;
                     if (supabaseUser) {
                         setUser({ name: supabaseUser.user_metadata?.name || supabaseUser.email, email: supabaseUser.email });
                         supabaseUserEmail = supabaseUser.email || "";

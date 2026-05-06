@@ -15,6 +15,7 @@ type MenuItem = {
     price: number;
     category: string;
     image?: string;
+    isVeg?: boolean;
     isSoldOut?: boolean;
 };
 

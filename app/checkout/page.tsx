@@ -698,8 +698,9 @@ export default function CheckoutPage() {
             const token = getAuthToken();
             const supabase = createSupabaseBrowserClient();
             const {
-                data: { user: supabaseUser },
-            } = await supabase.auth.getUser();
+                data: { session },
+            } = await supabase.auth.getSession();
+            const supabaseUser = session?.user ?? null;
 
             if (!token && !supabaseUser) {
                 router.push("/login?next=/checkout");
