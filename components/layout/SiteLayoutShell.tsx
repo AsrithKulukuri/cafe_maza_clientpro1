@@ -19,11 +19,12 @@ type SiteLayoutShellProps = {
 export function SiteLayoutShell({ children }: SiteLayoutShellProps) {
     const [showSplash, setShowSplash] = useState(true);
     const pathname = usePathname();
+    const shouldShowSplash = showSplash && pathname === "/";
 
     useEffect(() => {
         const seen = window.sessionStorage.getItem("cafe-maza-splash");
-        if (seen) setShowSplash(false);
-    }, []);
+        if (seen || pathname !== "/") setShowSplash(false);
+    }, [pathname]);
 
     const handleSplashDone = () => {
         window.sessionStorage.setItem("cafe-maza-splash", "1");
@@ -32,7 +33,7 @@ export function SiteLayoutShell({ children }: SiteLayoutShellProps) {
 
     return (
         <>
-            <AnimatePresence mode="wait">{showSplash && <SplashScreen key="splash" onDone={handleSplashDone} />}</AnimatePresence>
+            <AnimatePresence mode="wait">{shouldShowSplash && <SplashScreen key="splash" onDone={handleSplashDone} />}</AnimatePresence>
             <PremiumUIProvider>
                 <div className="relative min-h-screen bg-[#0B0B0B] pb-24 text-[#F5F5F5] lg:pb-0" style={{ contain: "paint" }}>
                     <SmoothScrollController />

@@ -15,6 +15,7 @@ type MenuItem = {
     price: number;
     category: string;
     image?: string;
+    isVeg?: boolean;
     isSoldOut?: boolean;
 };
 
@@ -430,11 +431,17 @@ export function QuickOrderPanel() {
                             className="rounded-xl border border-[#CFAF63]/20 bg-[#0F0F0F] p-3 text-left transition hover:border-[#CFAF63]/50 disabled:opacity-50"
                         >
                             <div className="flex items-start justify-between gap-3">
-                                <div>
+                                <div className="flex-1">
                                     <p className="font-medium text-[#F5F5F5]">{item.name}</p>
-                                    <p className="text-xs text-[#999]">{item.category}</p>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <p className="text-xs text-[#999]">{item.category}</p>
+                                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${item.isVeg ? "bg-emerald-500/25 text-emerald-300 border border-emerald-500/40" : "bg-red-500/25 text-red-300 border border-red-500/40"}`}>
+                                            <span className="inline-block h-1.5 w-1.5 rounded-full bg-current" />
+                                            {item.isVeg ? "Veg" : "Non-Veg"}
+                                        </span>
+                                    </div>
                                 </div>
-                                <p className="text-[#CFAF63]">₹{item.price}</p>
+                                <p className="text-[#CFAF63] font-semibold">₹{item.price}</p>
                             </div>
                             {item.isSoldOut ? <p className="mt-2 text-xs text-rose-300">Sold out</p> : null}
                         </button>

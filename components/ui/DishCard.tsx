@@ -110,7 +110,7 @@ export const DishCard = memo(function DishCard({ dish, onAdd, priority = false }
                     <div className="flex-1">
                         <h3 className="font-(--font-heading) text-2xl text-[#F5F5F5] leading-tight">{dish.name}</h3>
                         <motion.span
-                            className={`mt-2 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold transition ${isVeg ? "bg-[#00D98E]/25 text-[#4FE0A6]" : "bg-[#FF6A00]/25 text-[#FF8533]"
+                            className={`mt-2 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold transition ${isVeg ? "bg-emerald-500/25 text-emerald-300 border border-emerald-500/50" : "bg-red-500/25 text-red-300 border border-red-500/50"
                                 }`}
                             whileHover={{ scale: 1.08 }}
                         >

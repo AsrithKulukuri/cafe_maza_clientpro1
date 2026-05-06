@@ -139,7 +139,7 @@ export default function AdminDashboard() {
     const [activeTab, setActiveTab] = useState<TabType>("analytics");
     const [newMenuItem, setNewMenuItem] = useState({
         name: "",
-        category: "soups",
+        category: "bakery",
         price: "",
         image: "",
         isVeg: true,
@@ -372,7 +372,7 @@ export default function AdminDashboard() {
             setMenuItems((prev) => [created, ...prev]);
             setNewMenuItem({
                 name: "",
-                category: "soups",
+                category: "bakery",
                 price: "",
                 image: "",
                 isVeg: true,
@@ -1042,12 +1042,29 @@ export default function AdminDashboard() {
                                         onChange={(e) => setNewMenuItem({ ...newMenuItem, category: e.target.value })}
                                         className="rounded-xl border border-[#CFAF63]/25 bg-[#121212] px-4 py-3 text-[#F5F5F5] focus:outline-none"
                                     >
-                                        <option value="soups">Soups</option>
-                                        <option value="starters">Chinese Starters</option>
-                                        <option value="tandoori">Tandoori</option>
-                                        <option value="main">Main Course</option>
+                                        <option value="bakery">Bakery</option>
+                                        <option value="beverages">Beverages</option>
                                         <option value="biryani">Biryani</option>
+                                        <option value="biryanis-(veg-non-veg)">Biryanis (Veg & Non-Veg)</option>
+                                        <option value="cafe-maza-sizzlers">Cafe Maza Sizzlers</option>
+                                        <option value="cafe-maza-specials">Cafe Maza Specials</option>
+                                        <option value="cafe-maza-spl-combos">Cafe Maza Spl Combos</option>
+                                        <option value="chai-coffee">Chai & Coffee</option>
+                                        <option value="chinese-starters">Chinese Starters</option>
+                                        <option value="chinese-starters-(veg-non-veg)">Chinese Starters (Veg & Non-Veg)</option>
                                         <option value="desserts">Desserts</option>
+                                        <option value="desserts-sweets">Desserts & Sweets</option>
+                                        <option value="hakka-noodles-fried-rice">Hakka Noodles & Fried Rice</option>
+                                        <option value="indian-breads">Indian Breads</option>
+                                        <option value="main-course">Main Course</option>
+                                        <option value="main-course-(veg-non-veg)">Main Course (Veg & Non-Veg)</option>
+                                        <option value="mocktails">Mocktails</option>
+                                        <option value="non-veg-soups">Non Veg Soups</option>
+                                        <option value="seafood">Seafood</option>
+                                        <option value="soups">Soups</option>
+                                        <option value="tandoori">Tandoori</option>
+                                        <option value="tandoori-starters-(veg-non-veg)">Tandoori Starters (Veg & Non-Veg)</option>
+                                        <option value="veg-soups">Veg Soups</option>
                                     </select>
                                     <input
                                         type="number"
