@@ -71,11 +71,19 @@ export function Navbar() {
     useEffect(() => {
         let mounted = true;
 
-        supabase.auth.getUser().then(({ data }) => {
-            if (mounted) {
-                setSupabaseUser(data.user ?? null);
-            }
-        });
+        supabase.auth.getUser()
+            .then(({ data }) => {
+                if (mounted) {
+                    setSupabaseUser(data.user ?? null);
+                }
+            })
+            .catch((error) => {
+                // Handle network/connectivity errors gracefully during dev
+                if (mounted) {
+                    console.warn("Failed to fetch Supabase user (likely network issue):", error?.message);
+                    setSupabaseUser(null);
+                }
+            });
 
         const { data } = supabase.auth.onAuthStateChange((_event, session) => {
             setSupabaseUser(session?.user ?? null);
@@ -92,7 +100,11 @@ export function Navbar() {
         setUser(null);
 
         if (supabaseUser) {
-            await supabase.auth.signOut();
+            try {
+                await supabase.auth.signOut();
+            } catch (error) {
+                console.warn("Logout failed (likely network issue):", error instanceof Error ? error.message : error);
+            }
             setSupabaseUser(null);
         }
     };
