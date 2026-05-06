@@ -10,7 +10,7 @@ router.get("/", async (req, res, next) => {
     try {
         const items = await MenuItem.find()
             .select("name category price image isVeg isPopular isBestSeller isSoldOut tags createdAt")
-            .sort({ createdAt: -1 })
+            .sort({ createdAt: 1, _id: 1 })
             .lean();
         res.set("Cache-Control", "public, max-age=300, stale-while-revalidate=3600");
         return res.json(items);
