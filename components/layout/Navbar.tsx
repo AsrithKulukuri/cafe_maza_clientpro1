@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import type { User } from "@supabase/supabase-js";
 import { navLinks } from "@/data/mockData";
 import { BrandLogo } from "@/components/ui/BrandLogo";
-import { Menu, ShoppingBag, X } from "lucide-react";
+import { ChevronDown, Menu, ShoppingBag, X } from "lucide-react";
 import { usePremiumUI } from "@/components/providers/PremiumUIProvider";
 import { clearAuthSession, getAuthUser, type AppUser } from "@/lib/authToken";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
@@ -15,8 +15,12 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 export function Navbar() {
     const [scrolled, setScrolled] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+    const [portalsMenuOpen, setPortalsMenuOpen] = useState(false);
     const [user, setUser] = useState<AppUser | null>(null);
     const [supabaseUser, setSupabaseUser] = useState<User | null>(null);
+    const accountMenuRef = useRef<HTMLDivElement | null>(null);
+    const portalsMenuRef = useRef<HTMLDivElement | null>(null);
     const pathname = usePathname();
     const { cartCount, openCart, openBooking } = usePremiumUI();
     const supabase = useMemo(() => createSupabaseBrowserClient(), []);
@@ -41,6 +45,28 @@ export function Navbar() {
     useEffect(() => {
         setUser(getAuthUser());
     }, [pathname]);
+
+    useEffect(() => {
+        setAccountMenuOpen(false);
+        setPortalsMenuOpen(false);
+    }, [pathname]);
+
+    useEffect(() => {
+        const handleDocumentClick = (event: MouseEvent) => {
+            const target = event.target as Node;
+
+            if (accountMenuRef.current && !accountMenuRef.current.contains(target)) {
+                setAccountMenuOpen(false);
+            }
+
+            if (portalsMenuRef.current && !portalsMenuRef.current.contains(target)) {
+                setPortalsMenuOpen(false);
+            }
+        };
+
+        document.addEventListener("mousedown", handleDocumentClick);
+        return () => document.removeEventListener("mousedown", handleDocumentClick);
+    }, []);
 
     useEffect(() => {
         let mounted = true;
@@ -79,6 +105,7 @@ export function Navbar() {
         null;
     const displayName = user?.name || supabaseName;
     const displayRole = user?.role || (supabaseUser ? "customer" : null);
+    const shortName = (displayName || "Account").split(" ")[0];
 
     return (
         <header
@@ -122,34 +149,43 @@ export function Navbar() {
                         ) : null}
                     </button>
                     {displayName && displayRole ? (
-                        <>
-                            <div className="hidden sm:block rounded-full border border-[#00D98E]/35 px-4 py-2 text-xs text-[#00D98E]">
-                                Hi, {displayName} ({formatRole(displayRole)})
-                            </div>
-                            <motion.div
-                                whileHover={{ y: -2 }}
-                                className="hidden sm:block"
+                        <div ref={accountMenuRef} className="relative hidden sm:block">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setAccountMenuOpen((prev) => !prev);
+                                    setPortalsMenuOpen(false);
+                                }}
+                                className="inline-flex items-center gap-2 rounded-full border border-[#00D98E]/35 px-4 py-2 text-xs text-[#00D98E] transition hover:border-[#00D98E]"
                             >
-                                <Link href="/my-orders" className="rounded-full border border-[#CFAF63]/40 px-4 py-2 text-xs text-[#CFAF63] hover:border-[#FF6A00] transition">
-                                    My Orders
-                                </Link>
-                            </motion.div>
-                            <motion.div
-                                whileHover={{ y: -2 }}
-                                className="hidden sm:block"
-                            >
-                                <Link href="/profile" className="rounded-full border border-[#6CA3EA]/40 px-4 py-2 text-xs text-[#6CA3EA] hover:border-[#3B82F6] transition">
-                                    Profile
-                                </Link>
-                            </motion.div>
-                            <motion.button
-                                whileHover={{ y: -2 }}
-                                onClick={() => void handleLogout()}
-                                className="hidden sm:block rounded-full border border-[#FF6A00]/40 px-4 py-2 text-xs text-[#FF6A00]"
-                            >
-                                Logout
-                            </motion.button>
-                        </>
+                                Hi, {shortName}
+                                <ChevronDown size={14} className={`transition-transform ${accountMenuOpen ? "rotate-180" : ""}`} />
+                            </button>
+
+                            {accountMenuOpen ? (
+                                <div className="absolute right-0 mt-2 w-44 rounded-2xl border border-[#CFAF63]/20 bg-[#101010]/95 p-2 backdrop-blur-xl">
+                                    <p className="px-3 py-2 text-[11px] text-[#00D98E]">
+                                        {displayName} ({formatRole(displayRole)})
+                                    </p>
+                                    <Link href="/my-orders" className="block rounded-lg px-3 py-2 text-sm text-[#CFAF63] hover:bg-[#CFAF63]/10">
+                                        My Orders
+                                    </Link>
+                                    <Link href="/profile" className="block rounded-lg px-3 py-2 text-sm text-[#6CA3EA] hover:bg-[#6CA3EA]/10">
+                                        Profile
+                                    </Link>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            void handleLogout();
+                                            setAccountMenuOpen(false);
+                                        }}
+                                        className="block w-full rounded-lg px-3 py-2 text-left text-sm text-[#FF6A00] hover:bg-[#FF6A00]/10"
+                                    >
+                                        Logout
+                                    </button>
+                                </div>
+                            ) : null}
+                        </div>
                     ) : (
                         <motion.div whileHover={{ y: -2 }} className="hidden sm:block">
                             <Link href="/login" className="rounded-full border border-[#CFAF63]/40 px-4 py-2 text-xs text-[#F5F5F5]">
@@ -157,21 +193,33 @@ export function Navbar() {
                             </Link>
                         </motion.div>
                     )}
-                    <motion.div whileHover={{ y: -2 }} className="hidden xl:block">
-                        <Link href="/staff-login" className="rounded-full border border-[#CFAF63]/40 px-4 py-2 text-xs text-[#F5F5F5]">
-                            Staff
-                        </Link>
-                    </motion.div>
-                    <motion.div whileHover={{ y: -2 }} className="hidden xl:block">
-                        <Link href="/delivery-login" className="rounded-full border border-[#3B82F6]/40 px-4 py-2 text-xs text-[#6CA3EA]">
-                            Delivery
-                        </Link>
-                    </motion.div>
-                    <motion.div whileHover={{ y: -2 }} className="hidden xl:block">
-                        <Link href="/admin-login" className="rounded-full border border-[#FF6A00]/40 px-4 py-2 text-xs text-[#FF6A00]">
-                            Admin
-                        </Link>
-                    </motion.div>
+                    <div ref={portalsMenuRef} className="relative hidden xl:block">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setPortalsMenuOpen((prev) => !prev);
+                                setAccountMenuOpen(false);
+                            }}
+                            className="inline-flex items-center gap-2 rounded-full border border-[#CFAF63]/35 px-4 py-2 text-xs text-[#CFAF63] transition hover:border-[#FF6A00] hover:text-[#FF6A00]"
+                        >
+                            Portals
+                            <ChevronDown size={14} className={`transition-transform ${portalsMenuOpen ? "rotate-180" : ""}`} />
+                        </button>
+
+                        {portalsMenuOpen ? (
+                            <div className="absolute right-0 mt-2 w-40 rounded-2xl border border-[#CFAF63]/20 bg-[#101010]/95 p-2 backdrop-blur-xl">
+                                <Link href="/staff-login" className="block rounded-lg px-3 py-2 text-sm text-[#F5F5F5] hover:bg-[#CFAF63]/10">
+                                    Staff
+                                </Link>
+                                <Link href="/delivery-login" className="block rounded-lg px-3 py-2 text-sm text-[#6CA3EA] hover:bg-[#6CA3EA]/10">
+                                    Delivery
+                                </Link>
+                                <Link href="/admin-login" className="block rounded-lg px-3 py-2 text-sm text-[#FF6A00] hover:bg-[#FF6A00]/10">
+                                    Admin
+                                </Link>
+                            </div>
+                        ) : null}
+                    </div>
                     <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="lg:hidden p-2">
                         {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
                     </button>
